@@ -1,0 +1,2115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#050a14">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FOCUS">
+    <link rel="icon" href="icons/icon-32.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <title>FOCUS - تطبيق التركيز والمذاكرة</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #050a14;
+            color: #fff;
+            overflow-x: hidden;
+            transition: background .35s ease, color .35s ease;
+        }
+
+        body { overscroll-behavior: none; }
+
+        button, input, select { font-family: inherit; outline: none; }
+        button { -webkit-user-select: none; user-select: none; }
+
+        /* ========================= INTRO ========================== */
+        #intro {
+            position: fixed; inset: 0; z-index: 99999; background: #000;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        #intro img {
+            width: min(65vw, 260px); max-height: 65vh; object-fit: contain; opacity: 0;
+            transform: translateY(-120px) scale(.92);
+            animation: introDrop 1.1s cubic-bezier(.2,.8,.2,1) forwards;
+        }
+        #introTapHint {
+            position: absolute; bottom: 14vh; left: 0; right: 0; text-align: center;
+            color: #7fd8ff; font-size: 13px; font-weight: 800; opacity: 0;
+            transition: opacity .4s ease; pointer-events: none;
+        }
+        #introTapHint.show { opacity: 1; animation: hintPulse 1.6s ease-in-out infinite; }
+        @keyframes hintPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+        #intro.hide { animation: introOut .5s ease forwards; }
+        @keyframes introDrop {
+            0% { opacity: 0; transform: translateY(-120px) scale(.92); }
+            65% { opacity: 1; transform: translateY(8px) scale(1.02); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes introOut { to { opacity: 0; visibility: hidden; } }
+
+        /* ========================= APP ========================== */
+        #app {
+            width: 100%; max-width: 680px; margin: 0 auto; padding: 22px 18px;
+            display: flex; flex-direction: column; gap: 22px; min-height: 100vh;
+        }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand img { width: 48px; height: 48px; object-fit: contain; border-radius: 14px; }
+        .brand-text h1 {
+            font-size: 24px; font-weight: 900; letter-spacing: 2px;
+            background: linear-gradient(135deg, #fff 0%, #00d4ff 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .header-actions { display: flex; align-items: center; gap: 8px; }
+        .icon-btn {
+            width: 46px; height: 46px; border-radius: 14px; border: 1px solid #1a293e;
+            background: #0d1726; color: #fff; font-size: 20px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: .2s ease;
+        }
+        .icon-btn:active { transform: scale(.92); }
+
+        /* ========================= TIMER ========================== */
+        .timer-card {
+            background: #0b1322; border: 1px solid #162438; border-radius: 32px;
+            padding: 30px 16px 36px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.6);
+            display: flex; flex-direction: column; align-items: center; position: relative;
+        }
+        .mode-badge {
+            display: inline-block; padding: 6px 18px; background: rgba(255,255,255,.04);
+            border: 1px solid rgba(255,255,255,.12); border-radius: 20px; color: #b8c7dc;
+            font-size: 13px; font-weight: 800; margin-bottom: 24px;
+        }
+        .circle-container {
+            position: relative; width: min(85vw, 380px); height: min(85vw, 380px);
+            margin: 0 auto; touch-action: none; user-select: none;
+        }
+        .circle-svg { width: 100%; height: 100%; overflow: visible; }
+        .circle-track { fill: none; stroke: #ffffff; stroke-width: 16; opacity: .92; }
+        .circle-progress {
+            fill: none; stroke: url(#blueGradient); stroke-width: 16; stroke-linecap: round;
+            transform: rotate(-90deg); transform-origin: 180px 180px; opacity: 0;
+            transition: stroke-dashoffset .35s linear, opacity .45s ease;
+        }
+        body.timer-running .circle-progress { opacity: 1; }
+        .drag-handle {
+            position: absolute; width: 38px; height: 38px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #1b3350 0%, #05080f 75%);
+            border: 3px solid #00d4ff;
+            box-shadow: 0 0 0 4px rgba(0,212,255,.18), 0 6px 20px rgba(0,0,0,.7), 0 0 16px rgba(0,212,255,.45);
+            transform: translate(-50%, -50%); z-index: 20; cursor: grab; touch-action: none;
+            transition: box-shadow .2s ease, transform .1s ease;
+        }
+        .drag-handle::after {
+            content: ""; position: absolute; inset: 0; margin: auto; width: 8px; height: 8px;
+            border-radius: 50%; background: #00d4ff; box-shadow: 0 0 10px #00d4ff;
+        }
+        .drag-handle:active {
+            cursor: grabbing; transform: translate(-50%, -50%) scale(1.18);
+            box-shadow: 0 0 0 7px rgba(0,212,255,.22), 0 0 24px rgba(0,212,255,.6);
+        }
+        body.timer-running .drag-handle { display: none; }
+        .circle-inner-display {
+            position: absolute; inset: 16%; border-radius: 50%; display: flex;
+            justify-content: center; align-items: center; flex-direction: column;
+            background: radial-gradient(circle, #0e192b 0%, #050a14 100%);
+            border: 1px solid #18273c; pointer-events: none;
+        }
+        .time-text {
+            font-size: clamp(46px, 12vw, 62px); font-weight: 900; font-variant-numeric: tabular-nums;
+            color: #fff; text-shadow: 0 0 20px rgba(255,255,255,.08);
+        }
+        .active-task-label {
+            font-size: 11px; color: #7b93b4; font-weight: 700; margin-top: 4px; max-width: 80%;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .controls-group {
+            display: flex; justify-content: center; align-items: center; gap: 16px;
+            margin-top: 28px; width: 100%;
+        }
+        .btn-primary {
+            flex: 1; max-width: 180px; padding: 14px 28px; border: 0; border-radius: 18px;
+            color: #fff; font-weight: 900; font-size: 18px;
+            background: linear-gradient(135deg,#00d4ff 0%,#0052ff 100%); cursor: pointer;
+            box-shadow: 0 8px 25px rgba(0,150,255,.4); transition: .2s ease;
+        }
+        .btn-primary:active { transform: scale(.96); }
+        .btn-secondary {
+            width: 52px; height: 52px; border-radius: 18px; border: 1px solid #1a293e;
+            background: #0d1726; color: #fff; font-size: 22px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-focus-lock {
+            width: 100%; margin-top: 18px; padding: 22px 18px; border-radius: 22px;
+            border: 1px solid #00d4ff;
+            color: #fff; font-weight: 900; font-size: 19px; cursor: pointer;
+            background: linear-gradient(135deg,#0a2a4d 0%,#06111f 100%);
+            box-shadow: 0 10px 30px rgba(0,150,255,.25), inset 0 0 0 1px rgba(0,212,255,.15);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+            transition: .2s ease;
+        }
+        .btn-focus-lock:active { transform: scale(.97); }
+        .btn-focus-lock .fl-title { display: flex; align-items: center; gap: 8px; }
+        .btn-focus-lock strong { color: #00d4ff; }
+        .btn-focus-lock small { font-size: 12px; font-weight: 700; color: #7fb4dd; }
+
+        /* ========================= INSTALL BUTTON ========================== */
+        .btn-install {
+            width: 100%; margin-top: 12px; padding: 15px; border-radius: 18px;
+            border: 1px dashed #2a9d6b; color: #6dffb0; font-weight: 900; font-size: 15px;
+            background: rgba(52,199,120,.08); cursor: pointer; display: none;
+            align-items: center; justify-content: center; gap: 8px; transition: .2s ease;
+        }
+        .btn-install.show { display: flex; }
+        .btn-install:active { transform: scale(.97); }
+
+        /* ========================= NEXT LESSON BANNER ========================== */
+        .next-lesson {
+            display: flex; align-items: center; gap: 12px; width: 100%;
+            background: linear-gradient(135deg,#10233c,#0a1626); border: 1px solid #1c3652;
+            border-radius: 18px; padding: 14px 16px;
+        }
+        .next-lesson .nl-icon {
+            width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; display: flex;
+            align-items: center; justify-content: center; font-size: 22px;
+            background: rgba(0,212,255,.12); border: 1px solid rgba(0,212,255,.3);
+        }
+        .next-lesson .nl-body { flex: 1; min-width: 0; text-align: right; }
+        .next-lesson .nl-label { font-size: 11px; font-weight: 800; color: #6f9dc9; }
+        .next-lesson .nl-title { font-size: 15px; font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .next-lesson .nl-countdown { font-size: 12px; font-weight: 800; color: #00d4ff; margin-top: 2px; }
+
+        /* ========================= MIND MAP ========================== */
+        .mindmap-wrap {
+            position: relative; width: 100%; min-height: 340px; padding: 10px 0;
+            display: flex; flex-direction: column; align-items: center; gap: 0;
+        }
+        .mindmap-center {
+            padding: 14px 22px; border-radius: 20px; font-weight: 900; font-size: 16px; color: #04121f;
+            background: linear-gradient(135deg,#00d4ff,#0052ff); box-shadow: 0 8px 24px rgba(0,150,255,.4);
+            z-index: 2; margin-bottom: 6px;
+        }
+        .mindmap-day-group { width: 100%; margin-top: 14px; }
+        .mindmap-day-head {
+            display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 30px;
+            font-size: 13px; font-weight: 900; color: #fff; margin-bottom: 10px;
+            background: #12233c; border: 1px solid #24405f;
+        }
+        .mindmap-branches { display: flex; flex-wrap: wrap; gap: 8px; padding-right: 14px; border-right: 2px dashed #24405f; }
+        .mindmap-node {
+            padding: 9px 14px; border-radius: 14px; font-size: 13px; font-weight: 800; color: #cfe4fb;
+            background: #0b1626; border: 1px solid #1c3352;
+        }
+        .mindmap-node b { color: #00d4ff; font-size: 11px; margin-right: 4px; }
+        .mindmap-empty { color: #5d7a9c; }
+        .empty-hint { text-align: center; color: #5d7a9c; font-size: 13px; font-weight: 700; padding: 24px 10px; }
+        .mindmap-day-head.free { background: rgba(52,199,89,.1); border-color: #1f5b3f; color: #6dffb0; }
+        .mindmap-free-note {
+            padding: 9px 14px; border-radius: 14px; font-size: 12.5px; font-weight: 700; color: #6dffb0;
+            background: rgba(52,199,89,.08); border: 1px dashed #1f5b3f;
+        }
+
+        /* ========================= BEST DAYS ========================== */
+        .bestdays-list { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+        .bestday-row { display: flex; align-items: center; gap: 10px; }
+        .bestday-name { width: 58px; font-size: 13px; font-weight: 800; color: #b8c7dc; flex-shrink: 0; }
+        .bestday-badge {
+            flex: none; font-size: 10.5px; font-weight: 900; padding: 3px 9px; border-radius: 20px;
+            border: 1px solid #1f5b3f; color: #6dffb0; background: rgba(52,199,89,.1); white-space: nowrap;
+        }
+        .bestday-badge.busy { border-color: #3a2d1a; color: #ffd76a; background: rgba(255,180,0,.08); }
+        .bestday-bar-bg { flex: 1; height: 16px; background: #050a14; border: 1px solid #162438; border-radius: 8px; overflow: hidden; }
+        .bestday-bar-fill { height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg,#00d4ff,#0052ff); transition: width .5s ease; }
+        .bestday-bar-fill.top { background: linear-gradient(90deg,#ffd76a,#ffb300); }
+        .bestday-val { width: 52px; text-align: left; font-size: 12px; font-weight: 800; color: #7b93b4; flex-shrink: 0; }
+        .bestday-note { margin-top: 14px; padding: 12px 14px; border-radius: 14px; font-size: 13px; font-weight: 800;
+            background: rgba(255,180,0,.08); border: 1px solid rgba(255,180,0,.25); color: #ffd76a; text-align: center; }
+
+        /* ========================= DRAWER ========================== */
+        .drawer-overlay {
+            position: fixed; inset: 0; background: rgba(2,6,14,.75); backdrop-filter: blur(6px);
+            z-index: 999; opacity: 0; pointer-events: none; transition: opacity .3s ease;
+        }
+        .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+        .side-drawer {
+            position: fixed; top: 0; right: -100%; width: min(85vw,360px); height: 100vh;
+            background: #070e1a; border-left: 1px solid #162438; z-index: 1000;
+            transition: right .35s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .side-drawer.open { right: 0; }
+        .drawer-header {
+            padding: 20px; background: #0b1322; border-bottom: 1px solid #162438;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .drawer-header h2 { font-size: 18px; font-weight: 900; color: #fff; }
+        .menu-items-list { padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; }
+        .menu-tab-btn {
+            display: flex; align-items: center; justify-content: space-between; padding: 16px 18px;
+            background: #0b1322; border: 1px solid #162438; border-radius: 16px; color: #fff;
+            font-size: 15px; font-weight: 800; cursor: pointer; transition: .25s ease;
+        }
+        .menu-tab-btn:active { border-color: #fff; transform: translateX(-4px); }
+
+        /* ========================= MODALS ========================== */
+        .modal-page {
+            position: fixed; inset: 0; background: rgba(3,8,18,.85); backdrop-filter: blur(10px);
+            z-index: 2000; display: flex; justify-content: center; align-items: center; padding: 16px;
+            opacity: 0; pointer-events: none; transition: opacity .3s ease;
+        }
+        .modal-page.open { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            width: 100%; max-width: 480px; max-height: 85vh; background: #0b1322;
+            border: 1px solid #1a2c44; border-radius: 28px; box-shadow: 0 25px 60px rgba(0,0,0,.8);
+            display: flex; flex-direction: column; overflow: hidden; transform: translateY(20px);
+            transition: transform .3s ease;
+        }
+        .modal-page.open .modal-card { transform: translateY(0); }
+        .modal-header {
+            padding: 18px 20px; background: #070e1a; border-bottom: 1px solid #162438;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-header h3 { font-size: 17px; font-weight: 900; color: #fff; }
+        .modal-body { padding: 20px; overflow-y: auto; }
+
+        /* ========================= SOUNDS ========================== */
+        .sounds-list { display: flex; flex-direction: column; gap: 10px; }
+        .sounds-section-label {
+            margin: 18px 0 10px; font-size: 12px; font-weight: 900; color: #7b93b4;
+            padding-top: 12px; border-top: 1px dashed #1a293e;
+        }
+        body.light-mode .sounds-section-label { color: #64748b; border-color: #cbd5e1; }
+        .sound-card {
+            display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
+            background: #050a14; border: 1px solid #162438; border-radius: 14px;
+        }
+        .sound-info { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; }
+        .sound-play-btn {
+            padding: 8px 18px; border-radius: 10px; border: 1px solid #fff;
+            background: rgba(255,255,255,.05); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer;
+        }
+        .sound-play-btn.playing { background: #ff3b30; border-color: #ff3b30; }
+        .volume-row {
+            display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 16px;
+            background: #050a14; border: 1px solid #162438; border-radius: 14px; font-size: 13px; font-weight: 800;
+        }
+        .volume-row input[type=range] { flex: 1; accent-color: #00d4ff; }
+
+        /* ========================= NOTEBOOK ========================== */
+        .notebook-wrapper {
+            background: #fffdf0; color: #1e293b; border-radius: 20px; padding: 22px 18px; position: relative;
+            border-right: 12px solid #e2d9b8;
+            background-image: repeating-linear-gradient(#fffdf0,#fffdf0 31px,#cbd5e1 32px);
+            box-shadow: 0 10px 25px rgba(0,0,0,.3);
+        }
+        .notebook-spirals {
+            position: absolute; top: 0; right: 20px; left: 20px; height: 12px;
+            display: flex; justify-content: space-between;
+        }
+        .notebook-spirals span { width: 8px; height: 16px; background: #64748b; border-radius: 4px; margin-top: -8px; }
+        .notebook-title {
+            text-align: center; font-family: "Courier New",monospace; font-size: 22px; font-weight: 900;
+            color: #1e3a8a; margin-bottom: 16px; border-bottom: 2px dashed #2563eb; padding-bottom: 6px;
+        }
+        .todo-input-group { display: flex; gap: 8px; margin-bottom: 14px; }
+        .todo-input-group input {
+            flex: 1; padding: 10px 14px; background: rgba(255,255,255,.95); border: 1px solid #94a3b8;
+            border-radius: 10px; font-size: 13px; color: #0f172a; font-weight: 700;
+        }
+        .todo-input-group button {
+            padding: 10px 16px; background: #1e3a8a; border: none; border-radius: 10px; color: #fff;
+            font-weight: 900; font-size: 13px; cursor: pointer;
+        }
+        .todo-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .todo-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            font-size: 13px; font-weight: 800; padding: 6px 0;
+        }
+        .todo-item.completed span { text-decoration: line-through; color: #94a3b8; }
+        .btn-nb-action {
+            padding: 5px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff;
+            font-size: 11px; font-weight: 800; cursor: pointer;
+        }
+        .btn-nb-action.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+        /* ========================= WEEKLY ========================== */
+        .weekly-target-box {
+            display: flex; align-items: center; justify-content: space-between; background: #050a14;
+            padding: 14px 16px; border-radius: 14px; margin-bottom: 16px; border: 1px solid #162438;
+        }
+        .weekly-target-box label { font-size: 13px; color: #8ca6ce; font-weight: 700; }
+        .weekly-target-box input {
+            width: 70px; padding: 6px; background: #0d1726; border: 1px solid #1a293e; border-radius: 8px;
+            color: #fff; text-align: center; font-weight: 900; font-size: 15px;
+        }
+        .progress-bar-bg {
+            width: 100%; height: 20px; background: #050a14; border-radius: 10px;
+            border: 1px solid #162438; overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%; width: 0; background: linear-gradient(90deg,#00d4ff,#0052ff); transition: width .4s ease;
+        }
+        .percentage-text { font-size: 32px; font-weight: 900; color: #fff; text-align: center; margin-top: 10px; }
+        .stats-detail { font-size: 12px; color: #586c85; text-align: center; font-weight: 700; margin-top: 4px; }
+
+        /* ========================= QUICK TIMES / STATS ========================== */
+        .quick-times-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 20px; }
+        .quick-btn {
+            padding: 12px 6px; border-radius: 12px; border: 1px solid #1a293e; background: #0d1726;
+            color: #fff; font-weight: 800; font-size: 13px; cursor: pointer;
+        }
+        .quick-btn.active { background: linear-gradient(135deg,#00d4ff,#0052ff); border-color: transparent; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+        .stat-box {
+            text-align: center; padding: 14px 8px; background: #050a14; border: 1px solid #162438; border-radius: 16px;
+        }
+        .stat-box strong { display: block; font-size: 22px; font-weight: 900; color: #fff; }
+        .stat-box span { color: #586c85; font-size: 11px; font-weight: 700; }
+        .points-banner {
+            display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px;
+            padding: 16px; border-radius: 16px; font-weight: 900; font-size: 16px; color: #04121f;
+            background: linear-gradient(135deg,#ffd76a,#ffb300); box-shadow: 0 8px 24px rgba(255,180,0,.35);
+        }
+
+        /* ========================= SCHEDULE ========================== */
+        .schedule-form {
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; background: #050a14;
+            padding: 14px; border-radius: 16px; border: 1px solid #162438;
+        }
+        .form-row { display: flex; gap: 8px; }
+        .form-input {
+            flex: 1; padding: 10px; background: #0d1726; border: 1px solid #1a293e; border-radius: 10px;
+            color: #fff; font-size: 13px; font-weight: 700;
+        }
+        .btn-add-course {
+            padding: 12px; background: linear-gradient(135deg,#00d4ff,#0052ff); border: none;
+            border-radius: 10px; color: #fff; font-weight: 900; font-size: 14px; cursor: pointer;
+        }
+        .notification-toggle-box {
+            display: flex; justify-content: space-between; align-items: center; background: #0d1726;
+            padding: 12px 14px; border-radius: 12px; border: 1px solid #1a293e; margin-bottom: 16px; gap: 8px;
+        }
+        .notification-toggle-box span { font-size: 13px; font-weight: 800; color: #fff; }
+        .schedule-list { display: flex; flex-direction: column; gap: 10px; list-style: none; }
+        .schedule-card {
+            display: flex; justify-content: space-between; align-items: center; background: #050a14;
+            padding: 12px 14px; border-radius: 14px; border: 1px solid #162438;
+        }
+        .course-info strong { display: block; font-size: 14px; color: #fff; }
+        .course-info span { font-size: 12px; color: #7b93b4; font-weight: 700; }
+        .btn-del-course { background: transparent; border: none; color: #ff3b30; font-size: 16px; cursor: pointer; }
+
+        /* ========================= LIGHT MODE ========================== */
+        body.light-mode { background: #f2f6fa; color: #0f172a; }
+        body.light-mode .timer-card,
+        body.light-mode .side-drawer,
+        body.light-mode .modal-card { background: #fff; border-color: #cbd5e1; }
+        body.light-mode .drawer-header,
+        body.light-mode .modal-header { background: #f8fafc; border-color: #cbd5e1; }
+        body.light-mode .icon-btn,
+        body.light-mode .btn-secondary,
+        body.light-mode .shape-btn,
+        body.light-mode .btn-focus-lock,
+        body.light-mode .quick-btn { background: #f8fafc; color: #0f172a; border-color: #cbd5e1; }
+        body.light-mode .menu-tab-btn { background: #f1f5f9; border-color: #cbd5e1; color: #0f172a; }
+        body.light-mode .circle-track { stroke: #dbe4ee; }
+        body.light-mode .circle-inner-display { background: #fff; border-color: #cbd5e1; }
+        body.light-mode .time-text { color: #0f172a; text-shadow: none; }
+        body.light-mode .sound-card,
+        body.light-mode .stat-box,
+        body.light-mode .weekly-target-box,
+        body.light-mode .schedule-form,
+        body.light-mode .schedule-card,
+        body.light-mode .volume-row,
+        body.light-mode .notification-toggle-box { background: #f8fafc; border-color: #cbd5e1; }
+        body.light-mode .form-input { background: #fff; border-color: #cbd5e1; color: #0f172a; }
+
+        /* ========================= FULLSCREEN ========================== */
+        body.fullscreen-mode #app { max-width: none; min-height: 100vh; padding: 16px; }
+        body.fullscreen-mode .timer-card { min-height: calc(100vh - 110px); justify-content: center; }
+        @media (orientation: landscape) {
+            body.fullscreen-mode #app { max-width: 100%; }
+            body.fullscreen-mode .timer-card { min-height: calc(100vh - 40px); }
+            body.fullscreen-mode .circle-container { width: min(60vh,360px); height: min(60vh,360px); }
+        }
+
+        /* ========================= TOASTS ========================== */
+        #toastStack {
+            position: fixed; top: max(14px, env(safe-area-inset-top)); left: 0; right: 0;
+            z-index: 20000; display: flex; flex-direction: column; align-items: center; gap: 10px;
+            pointer-events: none; padding: 0 14px;
+        }
+        .app-toast {
+            pointer-events: auto; display: flex; align-items: center; gap: 10px;
+            max-width: 480px; width: 100%; background: #0d1726; border: 1px solid #1a293e;
+            border-radius: 16px; padding: 13px 14px; box-shadow: 0 14px 34px rgba(0,0,0,.55);
+            transform: translateY(-24px); opacity: 0; transition: transform .32s cubic-bezier(.2,.8,.2,1), opacity .32s ease;
+        }
+        .app-toast.show { transform: translateY(0); opacity: 1; }
+        .app-toast .toast-icon { font-size: 18px; flex: none; }
+        .app-toast .toast-msg { flex: 1; font-size: 13.5px; font-weight: 700; color: #e6edf7; line-height: 1.5; }
+        .app-toast .toast-close { background: none; border: none; color: #5c7192; font-size: 13px; cursor: pointer; flex: none; padding: 4px; }
+        .app-toast.toast-success { border-color: #1f5b3f; background: linear-gradient(135deg,#0d1726,#0d1f18); }
+        .app-toast.toast-warning { border-color: #5a4a1f; background: linear-gradient(135deg,#0d1726,#241d0d); }
+        .app-toast.toast-danger  { border-color: #5a2a34; background: linear-gradient(135deg,#0d1726,#22111a); }
+        body.light-mode .app-toast { background: #fff; border-color: #dbe4f0; }
+        body.light-mode .app-toast .toast-msg { color: #0f172a; }
+
+        /* ========================= CUSTOM CONFIRM MODAL ========================== */
+        #customConfirm {
+            position: fixed; inset: 0; z-index: 21000; display: none; align-items: center; justify-content: center;
+            background: rgba(2,6,14,.72); backdrop-filter: blur(8px); padding: 20px;
+        }
+        #customConfirm.open { display: flex; }
+        .cc-card {
+            width: 100%; max-width: 360px; background: #0b1322; border: 1px solid #1a293e;
+            border-radius: 22px; padding: 28px 22px 22px; text-align: center;
+            box-shadow: 0 24px 60px rgba(0,0,0,.6); animation: ccPop .28s cubic-bezier(.2,.8,.2,1);
+        }
+        @keyframes ccPop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .cc-icon { font-size: 34px; margin-bottom: 10px; }
+        .cc-title { font-size: 17px; font-weight: 900; color: #fff; margin-bottom: 8px; }
+        .cc-message { font-size: 13.5px; color: #9db0cc; line-height: 1.7; margin-bottom: 22px; }
+        .cc-actions { display: flex; gap: 10px; }
+        .cc-actions button { flex: 1; padding: 13px; border-radius: 14px; font-size: 14px; font-weight: 800; cursor: pointer; }
+        .cc-cancel { background: transparent; border: 1px solid #1a293e; color: #9db0cc; }
+        .cc-ok { background: linear-gradient(135deg,#00d4ff,#0052ff); border: none; color: #fff; }
+        .cc-ok.danger { background: linear-gradient(135deg,#ff7a8a,#c23b4e); }
+        body.light-mode .cc-card { background: #fff; border-color: #dbe4f0; }
+        body.light-mode .cc-title { color: #0f172a; }
+
+        /* ========================= FULL FOCUS LOCK OVERLAY ========================== */
+        #focusLock {
+            position: fixed; inset: 0; z-index: 5000; display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: 26px; padding: 24px; text-align: center;
+            background: radial-gradient(circle at 50% 30%, #0a1a30 0%, #03070f 70%);
+        }
+        #focusLock.open { display: flex; }
+        .lock-badge {
+            display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 30px;
+            border: 1px solid rgba(0,212,255,.35); color: #7fd8ff; font-size: 13px; font-weight: 900;
+            background: rgba(0,212,255,.06);
+        }
+        .lock-task { color: #86a1c4; font-size: 15px; font-weight: 800; max-width: 90%; }
+        .lock-ring { position: relative; width: min(78vw, 360px); height: min(78vw, 360px); }
+        .lock-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .lock-ring .lk-track { fill: none; stroke: #12233b; stroke-width: 14; }
+        .lock-ring .lk-prog {
+            fill: none; stroke: url(#lockGrad); stroke-width: 14; stroke-linecap: round;
+            transition: stroke-dashoffset .4s linear;
+        }
+        .lock-time {
+            position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; font-size: clamp(44px,13vw,64px); font-weight: 900; color: #fff;
+            font-variant-numeric: tabular-nums;
+        }
+        .lock-hint { color: #6f89ab; font-size: 13px; font-weight: 700; max-width: 300px; line-height: 1.6; }
+        .lock-emergency {
+            margin-top: 6px; padding: 11px 20px; border-radius: 14px; border: 1px solid #3a2530;
+            background: transparent; color: #7a5560; font-size: 12px; font-weight: 800; cursor: pointer;
+        }
+        .lock-sounds { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 360px; }
+        .lock-sound-btn {
+            width: 42px; height: 42px; border-radius: 13px; border: 1px solid #1a293e;
+            background: #0d1726; font-size: 17px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; position: relative;
+        }
+        .lock-sound-btn.playing { border-color: #00d4ff; background: rgba(0,212,255,.12); }
+        .lock-sound-btn.locked { opacity: .35; }
+
+        /* ========================= STORE ========================== */
+        .store-balance {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            background: linear-gradient(135deg, #10233d, #0a1626); border: 1px solid #1c3454;
+            border-radius: 18px; padding: 16px 18px; margin-bottom: 16px;
+        }
+        .store-balance .sb-label { font-size: 12px; color: #7fa8d8; font-weight: 800; }
+        .store-balance .sb-value { font-size: 26px; font-weight: 900; color: #fff; margin-top: 2px; }
+        .store-balance .sb-coin { font-size: 30px; }
+        .store-hint { font-size: 12px; color: #6f89ab; line-height: 1.7; margin-bottom: 16px; }
+        .store-grid { display: flex; flex-direction: column; gap: 12px; }
+        .store-item {
+            display: flex; align-items: center; gap: 12px; background: #0d1726; border: 1px solid #1a293e;
+            border-radius: 18px; padding: 14px;
+        }
+        .store-item.owned { border-color: #1f5b3f; background: linear-gradient(135deg,#0d1726,#0d1f18); }
+        .store-item-emoji { font-size: 28px; flex: none; width: 44px; text-align: center; }
+        .store-item-info { flex: 1; min-width: 0; }
+        .store-item-info .si-name { font-size: 14.5px; font-weight: 900; color: #fff; }
+        .store-item-info .si-desc { font-size: 11.5px; color: #7c8fac; margin-top: 3px; line-height: 1.5; }
+        .store-item-action { flex: none; display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 92px; }
+        .store-price { font-size: 12px; font-weight: 900; color: #ffd76a; text-align: center; }
+        .store-buy-btn {
+            padding: 9px 10px; border-radius: 11px; border: none; font-size: 12px; font-weight: 900;
+            background: linear-gradient(135deg,#00d4ff,#0052ff); color: #fff; cursor: pointer;
+        }
+        .store-buy-btn:disabled { background: #1a2436; color: #4c5c76; cursor: not-allowed; }
+        .store-owned-badge {
+            padding: 8px 10px; border-radius: 11px; background: rgba(52,199,89,.14); color: #6dffb0;
+            font-size: 11.5px; font-weight: 900; text-align: center; border: 1px solid #1f5b3f;
+        }
+        .store-preview-btn {
+            padding: 7px 10px; border-radius: 10px; border: 1px solid #1a293e; background: transparent;
+            color: #9db0cc; font-size: 11px; font-weight: 800; cursor: pointer;
+        }
+        body.light-mode .store-balance { background: linear-gradient(135deg,#eaf4ff,#f8fafc); border-color: #cbe0f7; }
+        body.light-mode .store-balance .sb-value { color: #0f172a; }
+        body.light-mode .store-item { background: #f8fafc; border-color: #dbe4f0; }
+        body.light-mode .store-item-info .si-name { color: #0f172a; }
+
+        /* ========================= NEXT LESSON (smooth) ========================== */
+        .next-lesson {
+            opacity: 0; transform: translateY(-10px) scaleY(.94); max-height: 0; overflow: hidden;
+            transition: opacity .35s cubic-bezier(.2,.8,.2,1), transform .35s cubic-bezier(.2,.8,.2,1), max-height .35s ease;
+            pointer-events: none;
+        }
+        .next-lesson.show { opacity: 1; transform: translateY(0) scaleY(1); max-height: 120px; pointer-events: auto; }
+
+        /* ========================= CELEBRATION SCREEN ========================== */
+        #celebrate {
+            position: fixed; inset: 0; z-index: 6000; display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: 18px; padding: 28px; text-align: center;
+            background: radial-gradient(circle at 50% 20%, #123a2a 0%, #04120c 60%, #03070f 100%);
+            overflow: hidden;
+        }
+        #celebrate.open { display: flex; animation: celebIn .5s ease; }
+        @keyframes celebIn { from { opacity: 0; } to { opacity: 1; } }
+        .celeb-emoji { font-size: 78px; animation: pop .6s cubic-bezier(.2,1.4,.3,1) both; }
+        @keyframes pop { 0% { transform: scale(0) rotate(-25deg); } 100% { transform: scale(1) rotate(0); } }
+        .celeb-title {
+            font-size: 30px; font-weight: 900;
+            background: linear-gradient(135deg,#8affc1,#00d4ff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .celeb-sub { color: #b6cbe0; font-size: 15px; font-weight: 700; max-width: 320px; line-height: 1.7; }
+        .celeb-points {
+            display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 6px 0;
+            padding: 20px 40px; border-radius: 22px; background: linear-gradient(135deg,#ffd76a,#ffb300);
+            color: #04121f; box-shadow: 0 12px 34px rgba(255,180,0,.45);
+        }
+        .celeb-points b { font-size: 46px; font-weight: 900; line-height: 1; }
+        .celeb-points small { font-size: 13px; font-weight: 900; letter-spacing: 1px; }
+        .celeb-total { color: #ffd76a; font-size: 14px; font-weight: 900; }
+        .celeb-btn {
+            margin-top: 8px; padding: 15px 40px; border: 0; border-radius: 18px; color: #fff;
+            font-weight: 900; font-size: 17px; cursor: pointer;
+            background: linear-gradient(135deg,#00d4ff 0%,#0052ff 100%);
+            box-shadow: 0 8px 25px rgba(0,150,255,.4);
+        }
+        .confetti {
+            position: absolute; top: -20px; width: 10px; height: 16px; opacity: .9; border-radius: 2px;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+
+        @media (max-width: 420px) {
+            #app { padding: 16px 12px; }
+            .timer-card { padding-left: 10px; padding-right: 10px; }
+            .circle-container { width: min(88vw,340px); height: min(88vw,340px); }
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- INTRO -->
+<div id="intro">
+    <img src="assets/img/intro.png" alt="FOCUS">
+    <div id="introTapHint">🔊 اضغط في أي مكان لتفعيل الصوت</div>
+</div>
+
+<!-- Hidden intro music (aesthetic only, not part of the ambient focus sounds) -->
+<audio id="introAudio" preload="auto">
+    <source src="assets/audio/focus.mp3" type="audio/mpeg">
+</audio>
+
+<!-- Hidden alarm audio (end of session / lesson reminder) -->
+<audio id="alarmAudio" preload="auto" loop>
+    <source src="assets/audio/alarm.mp3" type="audio/mpeg">
+</audio>
+
+<main id="app">
+
+    <header class="header">
+        <div class="brand">
+            <img src="assets/img/logo.png" alt="FOCUS Logo">
+            <div class="brand-text"><h1>FOCUS</h1></div>
+        </div>
+        <div class="header-actions">
+            <button class="icon-btn" id="themeToggleBtn" aria-label="تبديل المظهر">🌙</button>
+            <button class="icon-btn" id="fullscreenBtn" aria-label="ملء الشاشة">⛶</button>
+            <button class="icon-btn" id="menuToggleBtn" aria-label="القائمة">☰</button>
+        </div>
+    </header>
+
+    <section class="timer-card">
+        <div class="mode-badge" id="modeBadge">📚 وقت المذاكرة والتركيز</div>
+
+        <div class="circle-container" id="circleContainer">
+            <svg class="circle-svg" viewBox="0 0 360 360">
+                <defs>
+                    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#00d4ff"/>
+                        <stop offset="100%" stop-color="#0052ff"/>
+                    </linearGradient>
+                </defs>
+                <circle class="circle-track" cx="180" cy="180" r="155"></circle>
+                <circle class="circle-progress" id="circleProgress" cx="180" cy="180" r="155"></circle>
+            </svg>
+            <div class="drag-handle" id="dragHandle"></div>
+            <div class="circle-inner-display">
+                <div class="time-text" id="timeText">25:00</div>
+                <div class="active-task-label" id="activeTaskLabel">🎯 لا توجد مهمة محددة</div>
+            </div>
+        </div>
+
+        <div class="controls-group">
+            <button class="btn-secondary" id="resetBtn" aria-label="إعادة ضبط">↻</button>
+            <button class="btn-primary" id="startBtn">▶ ابدأ</button>
+        </div>
+
+        <button class="btn-focus-lock" id="focusLockBtn">
+            <span class="fl-title">🔒 <strong>التركيز الكامل</strong></span>
+            <small>خروج مجاني خلال أول 10 ثوانٍ — بعدها تُخصم نقاط</small>
+        </button>
+
+        <button class="btn-install" id="installBtn">⬇️ تثبيت التطبيق على جهازك (تشغيل بدون إنترنت)</button>
+    </section>
+
+    <section class="next-lesson" id="nextLessonBanner">
+        <div class="nl-icon">⏰</div>
+        <div class="nl-body">
+            <div class="nl-label">الدرس القادم</div>
+            <div class="nl-title" id="nextLessonTitle">—</div>
+            <div class="nl-countdown" id="nextLessonCountdown">—</div>
+        </div>
+    </section>
+</main>
+
+<!-- DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="side-drawer" id="sideDrawer">
+    <div class="drawer-header">
+        <h2>القائمة والصفحات</h2>
+        <button class="icon-btn" id="closeDrawerBtn">✕</button>
+    </div>
+    <div class="menu-items-list">
+        <button class="menu-tab-btn" data-target-modal="modalTasks"><span>📋 قائمة المهام</span><span>➔</span></button>
+        <button class="menu-tab-btn" data-target-modal="modalSchedule"><span>📚 جدول الدروس والتنبيهات</span><span>➔</span></button>
+        <button class="menu-tab-btn" data-target-modal="modalMindmap"><span>🧠 الخريطة الذهنية للدروس</span><span>➔</span></button>
+        <button class="menu-tab-btn" data-target-modal="modalBestDays"><span>📈 أفضل أيام المذاكرة</span><span>➔</span></button>
+        <button class="menu-tab-btn" data-target-modal="modalSounds"><span>🎧 أصوات التركيز</span><span>➔</span></button>
+        <button class="menu-tab-btn" data-target-modal="modalStore"><span>🛍️ متجر الأصوات</span><span>➔</span></button>
+        <button class="menu-tab-btn" data-target-modal="modalWeekly"><span>📅 الخطة الأسبوعية</span><span>➔</span></button>
+        <button class="menu-tab-btn" data-target-modal="modalStats"><span>⏱️ الأوقات والإحصائيات</span><span>➔</span></button>
+    </div>
+</aside>
+
+<!-- MIND MAP MODAL -->
+<div class="modal-page" id="modalMindmap">
+    <div class="modal-card">
+        <div class="modal-header"><h3>🧠 الخريطة الذهنية للدروس</h3><button class="icon-btn closeModalBtn">✕</button></div>
+        <div class="modal-body">
+            <div class="mindmap-wrap" id="mindmapWrap"></div>
+        </div>
+    </div>
+</div>
+
+<!-- BEST DAYS MODAL -->
+<div class="modal-page" id="modalBestDays">
+    <div class="modal-card">
+        <div class="modal-header"><h3>📈 أفضل أيام المذاكرة</h3><button class="icon-btn closeModalBtn">✕</button></div>
+        <div class="modal-body">
+            <div class="bestdays-list" id="bestDaysList"></div>
+            <div class="bestday-note" id="bestDayNote">ابدأ المذاكرة لتظهر لك أفضل أيامك!</div>
+        </div>
+    </div>
+</div>
+
+<!-- SOUNDS MODAL -->
+<div class="modal-page" id="modalSounds">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>🎧 أصوات الخلفية والتركيز</h3>
+            <button class="icon-btn closeModalBtn">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="sounds-list">
+                <div class="sound-card"><div class="sound-info"><span>🌧️</span><span>صوت المطر</span></div><button class="sound-play-btn" data-sound="rain">تشغيل</button></div>
+                <div class="sound-card"><div class="sound-info"><span>💨</span><span>صوت الرياح</span></div><button class="sound-play-btn" data-sound="wind">تشغيل</button></div>
+                <div class="sound-card"><div class="sound-info"><span>⛈️</span><span>صوت العاصفة</span></div><button class="sound-play-btn" data-sound="storm">تشغيل</button></div>
+                <div class="sound-card"><div class="sound-info"><span>⌨️</span><span>صوت الكيبورد</span></div><button class="sound-play-btn" data-sound="keyboard">تشغيل</button></div>
+                <div class="sound-card"><div class="sound-info"><span>🖊️</span><span>صوت الكتابة بالقلم</span></div><button class="sound-play-btn" data-sound="penl">تشغيل</button></div>
+                <div class="sound-card"><div class="sound-info"><span>📖</span><span>تقليب صفحات الكتاب</span></div><button class="sound-play-btn" data-sound="book">تشغيل</button></div>
+            </div>
+            <div class="sounds-section-label">🎁 أصوات إضافية هادئة</div>
+            <div class="sounds-list" id="premiumSoundsList"></div>
+            <div class="volume-row">🔊 مستوى الصوت <input type="range" id="soundVolume" min="0" max="100" value="70"></div>
+        </div>
+    </div>
+</div>
+
+<!-- STORE -->
+<div class="modal-page" id="modalStore">
+    <div class="modal-card">
+        <div class="modal-header"><h3>🛍️ متجر الأصوات</h3><button class="icon-btn closeModalBtn">✕</button></div>
+        <div class="modal-body">
+            <div class="store-balance">
+                <div>
+                    <div class="sb-label">رصيدك الحالي</div>
+                    <div class="sb-value" id="storeBalance">0 نقطة</div>
+                </div>
+                <div class="sb-coin">🪙</div>
+            </div>
+            <div class="store-hint">تكسب نقاطًا من كل جلسة مذاكرة ناجحة — كل ما تذاكر أكتر، كل ما تقدر تفتح أصوات أكتر. أسعار المتجر مقصود يكون فيها تحدي 😉</div>
+            <div class="store-grid" id="storeGrid"></div>
+        </div>
+    </div>
+</div>
+
+<!-- TASKS -->
+<div class="modal-page" id="modalTasks">
+    <div class="modal-card">
+        <div class="modal-header"><h3>📋 قائمة المهام اليومية</h3><button class="icon-btn closeModalBtn">✕</button></div>
+        <div class="modal-body">
+            <div class="notebook-wrapper">
+                <div class="notebook-spirals"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                <div class="notebook-title">TO-DO LIST</div>
+                <div class="todo-input-group">
+                    <input type="text" id="taskInput" placeholder="اكتب المهمة المراد إنجازها...">
+                    <button id="addTaskBtn">+ إضافة</button>
+                </div>
+                <ul class="todo-list" id="todoList"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SCHEDULE -->
+<div class="modal-page" id="modalSchedule">
+    <div class="modal-card">
+        <div class="modal-header"><h3>📚 جدول الدروس والتنبيهات</h3><button class="icon-btn closeModalBtn">✕</button></div>
+        <div class="modal-body">
+            <div class="notification-toggle-box">
+                <span>🔔 إشعارات مواعيد الدروس</span>
+                <button class="sound-play-btn" id="requestNotifBtn">تفعيل</button>
+            </div>
+            <div class="schedule-form">
+                <input type="text" id="courseTitle" class="form-input" placeholder="اسم المادة / الدرس...">
+                <div class="form-row">
+                    <select id="courseDay" class="form-input">
+                        <option value="الأحد">الأحد</option>
+                        <option value="الإثنين">الإثنين</option>
+                        <option value="الثلاثاء">الثلاثاء</option>
+                        <option value="الأربعاء">الأربعاء</option>
+                        <option value="الخميس">الخميس</option>
+                        <option value="الجمعة">الجمعة</option>
+                        <option value="السبت">السبت</option>
+                    </select>
+                    <input type="time" id="courseTime" class="form-input">
+                </div>
+                <button class="btn-add-course" id="addCourseBtn">+ إضافة للجدول</button>
+            </div>
+            <ul class="schedule-list" id="scheduleList"></ul>
+        </div>
+    </div>
+</div>
+
+<!-- WEEKLY -->
+<div class="modal-page" id="modalWeekly">
+    <div class="modal-card">
+        <div class="modal-header"><h3>📅 الخطة الأسبوعية ونسبة الإنجاز</h3><button class="icon-btn closeModalBtn">✕</button></div>
+        <div class="modal-body">
+            <div class="weekly-target-box">
+                <label for="weeklyTargetInput">هدف الأسبوع (ساعات):</label>
+                <input type="number" id="weeklyTargetInput" min="1" max="100" value="10">
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill" id="weeklyProgressBar"></div></div>
+            <div class="percentage-text" id="percentageText">0%</div>
+            <div class="stats-detail" id="statsDetailText">أنجزت 0 ساعة من أصل 10 ساعات</div>
+        </div>
+    </div>
+</div>
+
+<!-- STATS -->
+<div class="modal-page" id="modalStats">
+    <div class="modal-card">
+        <div class="modal-header"><h3>⏱️ الأوقات والإحصائيات</h3><button class="icon-btn closeModalBtn">✕</button></div>
+        <div class="modal-body">
+            <div class="points-banner">⭐ رصيدك: <span id="statPointsBanner">0</span> نقطة</div>
+            <div class="quick-times-grid">
+                <button class="quick-btn" data-mins="5">5 د</button>
+                <button class="quick-btn active" data-mins="25">25 د</button>
+                <button class="quick-btn" data-mins="45">45 د</button>
+                <button class="quick-btn" data-mins="60">60 د</button>
+                <button class="quick-btn" data-mins="90">90 د</button>
+                <button class="quick-btn" data-mins="120">120 د</button>
+                <button class="quick-btn" data-mins="150">150 د</button>
+                <button class="quick-btn" data-mins="180">180 د</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box"><strong id="statSessions">0</strong><span>جلسات</span></div>
+                <div class="stat-box"><strong id="statMinutes">0</strong><span>دقيقة</span></div>
+                <div class="stat-box"><strong id="statDays">1</strong><span>أيام متواصلة</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FULL FOCUS LOCK OVERLAY -->
+<!-- TOAST STACK (professional in-app notifications) -->
+<div id="toastStack"></div>
+
+<!-- CUSTOM CONFIRM MODAL -->
+<div id="customConfirm">
+    <div class="cc-card">
+        <div class="cc-icon">🔒</div>
+        <div class="cc-title"></div>
+        <div class="cc-message"></div>
+        <div class="cc-actions">
+            <button class="cc-cancel">إلغاء</button>
+            <button class="cc-ok">تأكيد</button>
+        </div>
+    </div>
+</div>
+
+<div id="focusLock">
+    <div class="lock-badge">🔒 وضع التركيز الكامل مُفعّل</div>
+    <div class="lock-task" id="lockTask">🎯 لا توجد مهمة محددة</div>
+    <div class="lock-ring">
+        <svg viewBox="0 0 300 300">
+            <defs>
+                <linearGradient id="lockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00d4ff"/>
+                    <stop offset="100%" stop-color="#0052ff"/>
+                </linearGradient>
+            </defs>
+            <circle class="lk-track" cx="150" cy="150" r="135"></circle>
+            <circle class="lk-prog" id="lockProgress" cx="150" cy="150" r="135"></circle>
+        </svg>
+        <div class="lock-time" id="lockTime">25:00</div>
+    </div>
+    <div class="lock-hint" id="lockHintText">لا تستسلم — ابقَ حتى تنتهي الجلسة. الخروج الآن يلغي نقاط هذه الجلسة.</div>
+    <div class="lock-sounds" id="lockSounds"></div>
+    <button class="lock-emergency" id="lockEmergencyBtn">إنهاء اضطراري (يلغي النقاط)</button>
+</div>
+
+<!-- CELEBRATION SCREEN -->
+<div id="celebrate">
+    <div class="celeb-emoji">🏆</div>
+    <div class="celeb-title" id="celebTitle">أحسنت! أنجزت جلستك</div>
+    <div class="celeb-sub" id="celebSub">لقد ركّزت بنجاح. استمر على هذا الأداء الرائع!</div>
+    <div class="celeb-points">
+        <b id="celebPoints">+0</b>
+        <small>نقطة مكتسبة</small>
+    </div>
+    <div class="celeb-total">⭐ إجمالي رصيدك: <span id="celebTotal">0</span> نقطة</div>
+    <button class="celeb-btn" id="celebBtn">استلام النقاط ✔</button>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    /* ========================= AUDIO SOURCES ========================== */
+    var SOUND_FILES = {
+        rain:     "assets/audio/rain.mp3",
+        wind:     "assets/audio/wind.mp3",
+        storm:    "assets/audio/storm.mp3",
+        keyboard: "assets/audio/keyboard.mp3",
+        penl:     "assets/audio/pen.mp3",
+        book:     "assets/audio/book.mp3",
+        ocean:    "assets/audio/ocean.mp3",
+        night:    "assets/audio/night.mp3",
+        fire:     "assets/audio/fire.mp3",
+        cafe:     "assets/audio/cafe.mp3",
+        chimes:   "assets/audio/chimes.mp3"
+    };
+    /* NOTE: focus.mp3 is intentionally NOT listed here — it is reserved for the
+       intro screen only and must never appear as a selectable ambient sound. */
+    var SOUND_META = {
+        rain:     { name: "صوت المطر",              emoji: "🌧️", free: true },
+        wind:     { name: "صوت الرياح",              emoji: "💨", free: true },
+        storm:    { name: "صوت العاصفة",             emoji: "⛈️", free: true },
+        keyboard: { name: "صوت الكيبورد",            emoji: "⌨️", free: true },
+        penl:     { name: "صوت الكتابة بالقلم",       emoji: "🖊️", free: true },
+        book:     { name: "تقليب صفحات الكتاب",      emoji: "📖", free: true },
+        ocean:    { name: "أمواج البحر",             emoji: "🌊", free: false, price: 150, desc: "أمواج هادئة متتابعة — رائعة لتصفية الذهن." },
+        night:    { name: "ليل هادئ (صرصور الليل)",  emoji: "🌙", free: false, price: 200, desc: "أجواء ليلية ساكنة بصوت صراصير خفيف." },
+        fire:     { name: "مدفأة هادئة",             emoji: "🔥", free: false, price: 250, desc: "فرقعة حطب دافئة تمنح إحساسًا بالراحة." },
+        cafe:     { name: "مقهى هادئ",               emoji: "☕", free: false, price: 320, desc: "همهمة مقهى بعيدة تساعد على التركيز العميق." },
+        chimes:   { name: "أجراس هادئة",             emoji: "🎐", free: false, price: 400, desc: "نغمات أجراس رقيقة متناثرة، مثالية للاسترخاء." }
+    };
+    var alarmAudio = document.getElementById("alarmAudio");
+
+    /* ========================= PROTECTED POINTS + STORE OWNERSHIP =========================
+       This is a plain client-side app with no server, so there is no way to make points
+       fully tamper-proof — anyone with devtools can still edit localStorage directly.
+       This signature just raises the bar against casual editing and resets to 0 if the
+       stored value doesn't match what our own code last wrote. */
+    var INTEGRITY_SALT = "focus-v1-9f3-k22";
+    function simpleHash(str) {
+        var h = 0;
+        for (var i = 0; i < str.length; i++) { h = (h * 31 + str.charCodeAt(i)) >>> 0; }
+        return h.toString(36);
+    }
+    function getPoints() {
+        var raw = localStorage.getItem("focusPoints");
+        var v = parseInt(raw || "0", 10);
+        if (isNaN(v) || v < 0) v = 0;
+        var sig = localStorage.getItem("focusPointsSig");
+        if (raw !== null && sig !== simpleHash(INTEGRITY_SALT + v)) {
+            v = 0; // mismatch => treat as tampered, reset
+        }
+        setPoints(v);
+        return v;
+    }
+    function setPoints(v) {
+        if (v < 0) v = 0;
+        localStorage.setItem("focusPoints", v);
+        localStorage.setItem("focusPointsSig", simpleHash(INTEGRITY_SALT + v));
+        return v;
+    }
+    function getOwnedSounds() {
+        try { return JSON.parse(localStorage.getItem("focusOwnedSounds") || "[]"); }
+        catch (e) { return []; }
+    }
+    function ownsSound(key) {
+        var meta = SOUND_META[key];
+        if (!meta) return false;
+        if (meta.free) return true;
+        return getOwnedSounds().indexOf(key) !== -1;
+    }
+    function buySound(key) {
+        var meta = SOUND_META[key];
+        if (!meta || meta.free) return;
+        if (ownsSound(key)) return;
+        var pts = getPoints();
+        if (pts < meta.price) {
+            showToast("نقاطك غير كافية — تحتاج " + (meta.price - pts) + " نقطة إضافية.", "warning");
+            return;
+        }
+        setPoints(pts - meta.price);
+        var owned = getOwnedSounds();
+        owned.push(key);
+        localStorage.setItem("focusOwnedSounds", JSON.stringify(owned));
+        updateStats();
+        renderStore();
+        renderPremiumSounds();
+        showToast(meta.emoji + " تم فتح \"" + meta.name + "\" بنجاح!", "success");
+    }
+
+    /* ========================= TOAST + CONFIRM (professional in-app messages) ========================= */
+    var toastStack = document.getElementById("toastStack");
+    function showToast(message, type, duration) {
+        if (!toastStack) { alert(message); return; }
+        type = type || "info";
+        duration = duration || 4200;
+        var el = document.createElement("div");
+        el.className = "app-toast toast-" + type;
+        var iconMap = { info: "ℹ️", success: "✅", warning: "⚠️", danger: "⛔" };
+        el.innerHTML = '<span class="toast-icon">' + (iconMap[type] || "ℹ️") + '</span><span class="toast-msg"></span><button class="toast-close">✕</button>';
+        el.querySelector(".toast-msg").textContent = message;
+        toastStack.appendChild(el);
+        requestAnimationFrame(function () { el.classList.add("show"); });
+        var timer = setTimeout(function () { dismiss(); }, duration);
+        function dismiss() {
+            clearTimeout(timer);
+            el.classList.remove("show");
+            setTimeout(function () { el.remove(); }, 320);
+        }
+        el.querySelector(".toast-close").onclick = dismiss;
+        return dismiss;
+    }
+    function showConfirm(opts) {
+        return new Promise(function (resolve) {
+            var box = document.getElementById("customConfirm");
+            if (!box) { resolve(confirm((opts.title ? opts.title + "\n" : "") + opts.message)); return; }
+            box.querySelector(".cc-icon").textContent = opts.icon || "🔒";
+            box.querySelector(".cc-title").textContent = opts.title || "";
+            box.querySelector(".cc-message").textContent = opts.message || "";
+            var okBtn = box.querySelector(".cc-ok");
+            var cancelBtn = box.querySelector(".cc-cancel");
+            okBtn.textContent = opts.okLabel || "تأكيد";
+            cancelBtn.textContent = opts.cancelLabel || "إلغاء";
+            okBtn.className = "cc-ok" + (opts.danger ? " danger" : "");
+            box.classList.add("open");
+            function cleanup(val) {
+                box.classList.remove("open");
+                okBtn.onclick = null; cancelBtn.onclick = null;
+                resolve(val);
+            }
+            okBtn.onclick = function () { cleanup(true); };
+            cancelBtn.onclick = function () { cleanup(false); };
+        });
+    }
+
+    /* ========================= MEDIA SESSION (so playback shows "FOCUS", not just "browser") ========================= */
+    function setMediaSessionSound(key) {
+        if (!("mediaSession" in navigator)) return;
+        var meta = SOUND_META[key];
+        try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: meta ? (meta.emoji + " " + meta.name) : "FOCUS",
+                artist: "FOCUS — أصوات التركيز",
+                album: "جلسة مذاكرة",
+                artwork: [{ src: "icons/icon-512.png", sizes: "512x512", type: "image/png" }]
+            });
+            navigator.mediaSession.playbackState = "playing";
+        } catch (e) {}
+    }
+    function clearMediaSessionIfNoneUnplaying() {
+        if (!("mediaSession" in navigator)) return;
+        var anyPlaying = Object.keys(audioPlayers || {}).some(function (k) { return audioPlayers[k] && !audioPlayers[k].paused; });
+        if (!anyPlaying) { try { navigator.mediaSession.playbackState = "paused"; } catch (e) {} }
+    }
+
+    /* ========================= INTRO (visual + aesthetic music only) ========================== */
+    var intro = document.getElementById("intro");
+    var introAudio = document.getElementById("introAudio");
+    var introTapHint = document.getElementById("introTapHint");
+    (function playIntroMusic() {
+        if (!introAudio) return;
+        introAudio.volume = 0.85;
+        var tryPlay = function () { return introAudio.play(); };
+        var unlock = function () {
+            tryPlay().then(function () {
+                if (introTapHint) introTapHint.classList.remove("show");
+            }).catch(function () {});
+            document.removeEventListener("pointerdown", unlock);
+        };
+        tryPlay().catch(function () {
+            // Autoplay blocked by the browser (normal on first visit) — invite a tap to unlock it.
+            if (introTapHint) introTapHint.classList.add("show");
+            document.addEventListener("pointerdown", unlock, { once: true });
+        });
+    })();
+    function fadeOutIntroAudio() {
+        if (!introAudio || introAudio.paused) return;
+        var steps = 10, i = 0;
+        var startVol = introAudio.volume;
+        var fade = setInterval(function () {
+            i++;
+            introAudio.volume = Math.max(0, startVol * (1 - i / steps));
+            if (i >= steps) { clearInterval(fade); introAudio.pause(); introAudio.currentTime = 0; }
+        }, 40);
+    }
+    setTimeout(function () {
+        fadeOutIntroAudio();
+        intro.classList.add("hide");
+        setTimeout(function () { intro.style.display = "none"; }, 520);
+    }, 2000);
+
+    /* ========================= THEME ========================== */
+    var themeToggleBtn = document.getElementById("themeToggleBtn");
+    if (localStorage.getItem("focusTheme") === "light") {
+        document.body.classList.add("light-mode");
+        themeToggleBtn.textContent = "☀️";
+        var mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = "#f2f6fa";
+    }
+    themeToggleBtn.onclick = function () {
+        document.body.classList.toggle("light-mode");
+        var isLight = document.body.classList.contains("light-mode");
+        themeToggleBtn.textContent = isLight ? "☀️" : "🌙";
+        var m = document.querySelector('meta[name=theme-color]'); if (m) m.content = isLight ? "#f2f6fa" : "#050a14";
+        localStorage.setItem("focusTheme", isLight ? "light" : "dark");
+    };
+
+    /* ========================= FULLSCREEN ========================== */
+    var fullscreenBtn = document.getElementById("fullscreenBtn");
+    async function toggleFullscreen() {
+        try {
+            if (!document.fullscreenElement) {
+                if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+                document.body.classList.add("fullscreen-mode");
+            } else {
+                await document.exitFullscreen();
+                document.body.classList.remove("fullscreen-mode");
+            }
+        } catch (e) { document.body.classList.toggle("fullscreen-mode"); }
+    }
+    fullscreenBtn.onclick = toggleFullscreen;
+    document.addEventListener("fullscreenchange", function () {
+        if (!document.fullscreenElement) document.body.classList.remove("fullscreen-mode");
+        // If user tries to leave fullscreen during full-focus, force it back
+        if (isFullFocus && !document.fullscreenElement) {
+            try { document.documentElement.requestFullscreen(); } catch (e) {}
+        }
+    });
+
+    /* ========================= WAKE LOCK (keep screen/app awake) ========================== */
+    var wakeLock = null;
+    async function requestWakeLock() {
+        try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+    }
+    function releaseWakeLock() { try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {} }
+    document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") {
+            if (isRunning) requestWakeLock();
+            syncTimer(); // recompute after returning from background
+        }
+    });
+
+    /* ========================= DRAWER ========================== */
+    var sideDrawer = document.getElementById("sideDrawer");
+    var drawerOverlay = document.getElementById("drawerOverlay");
+    function openDrawer() { sideDrawer.classList.add("open"); drawerOverlay.classList.add("open"); }
+    function closeDrawer() { sideDrawer.classList.remove("open"); drawerOverlay.classList.remove("open"); }
+    document.getElementById("menuToggleBtn").onclick = openDrawer;
+    document.getElementById("closeDrawerBtn").onclick = closeDrawer;
+    drawerOverlay.onclick = closeDrawer;
+    document.querySelectorAll(".menu-tab-btn").forEach(function (btn) {
+        btn.onclick = function () {
+            closeDrawer();
+            var targetId = this.dataset.targetModal;
+            document.getElementById(targetId).classList.add("open");
+            if (targetId === "modalStore" && typeof renderStore === "function") renderStore();
+            if (targetId === "modalSounds" && typeof renderPremiumSounds === "function") renderPremiumSounds();
+        };
+    });
+    document.querySelectorAll(".closeModalBtn").forEach(function (btn) {
+        btn.onclick = function () { this.closest(".modal-page").classList.remove("open"); };
+    });
+
+    /* ========================= TIMER CORE (timestamp based for background) ========================== */
+    var circleProgress = document.getElementById("circleProgress");
+    var dragHandle = document.getElementById("dragHandle");
+    var circleContainer = document.getElementById("circleContainer");
+    var timeText = document.getElementById("timeText");
+    var startBtn = document.getElementById("startBtn");
+    var resetBtn = document.getElementById("resetBtn");
+
+    var RADIUS = 155;
+    var CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+    circleProgress.style.strokeDasharray = CIRCUMFERENCE;
+    circleProgress.style.strokeDashoffset = CIRCUMFERENCE;
+
+    var LOCK_R = 135;
+    var LOCK_C = 2 * Math.PI * LOCK_R;
+    var lockProgress = document.getElementById("lockProgress");
+    var lockTime = document.getElementById("lockTime");
+    lockProgress.style.strokeDasharray = LOCK_C;
+    lockProgress.style.strokeDashoffset = LOCK_C;
+
+    var selectedMinutes = 25;
+    var remainingSeconds = selectedMinutes * 60;
+    var isRunning = false;
+    var isFullFocus = false;
+    var endTimestamp = 0;
+    var sessionStartTs = 0;
+    var FREE_EXIT_SECONDS = 10;
+    var timerInterval = null;
+
+    function formatTime(sec) {
+        if (sec < 0) sec = 0;
+        var m = Math.floor(sec / 60), s = sec % 60;
+        return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    }
+
+    function updateTimerDisplay() {
+        timeText.textContent = formatTime(remainingSeconds);
+        lockTime.textContent = formatTime(remainingSeconds);
+        var total = selectedMinutes * 60;
+        var progress = (!isRunning) ? 0 : (1 - remainingSeconds / total);
+        circleProgress.style.strokeDashoffset = isRunning ? CIRCUMFERENCE * (1 - progress) : CIRCUMFERENCE;
+        lockProgress.style.strokeDashoffset = LOCK_C * (1 - (isRunning ? progress : 0));
+        if (!isRunning) updateHandlePosition();
+    }
+
+    var MAX_DRAG_MINUTES = 180; // must match the mapping used in handleDrag()
+    function updateHandlePosition() {
+        var rect = circleContainer.getBoundingClientRect();
+        var center = rect.width / 2;
+        var radius = center - 18;
+        // The handle always reflects the selected duration (selectedMinutes),
+        // NOT the countdown progress — those are two different things and must
+        // never be computed from the same fraction, or the dot freezes in place.
+        var frac = Math.max(0, Math.min(1, selectedMinutes / MAX_DRAG_MINUTES));
+        var angle = (-Math.PI / 2) + frac * Math.PI * 2;
+        dragHandle.style.left = (center + radius * Math.cos(angle)) + "px";
+        dragHandle.style.top = (center + radius * Math.sin(angle)) + "px";
+    }
+    window.addEventListener("resize", function () { if (!isRunning) updateHandlePosition(); });
+
+    /* ===== background-safe tick: derive remaining from real clock ===== */
+    function syncTimer() {
+        if (!isRunning) return;
+        remainingSeconds = Math.round((endTimestamp - Date.now()) / 1000);
+        if (remainingSeconds <= 0) {
+            remainingSeconds = 0;
+            updateTimerDisplay();
+            stopTimerInternals();
+            finishSession();
+        } else {
+            updateTimerDisplay();
+            if (isFullFocus) refreshEmergencyBtn();
+        }
+    }
+
+    function stopTimerInternals() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        isRunning = false;
+        document.body.classList.remove("timer-running");
+        startBtn.textContent = "▶ ابدأ";
+        circleProgress.style.strokeDashoffset = CIRCUMFERENCE;
+        localStorage.removeItem("focusRunningSession");
+        releaseWakeLock();
+    }
+
+    function startTimer(fullFocus) {
+        if (remainingSeconds <= 0) remainingSeconds = selectedMinutes * 60;
+        // full focus always restarts a clean session
+        remainingSeconds = selectedMinutes * 60;
+        isRunning = true;
+        isFullFocus = !!fullFocus;
+        sessionStartTs = Date.now();
+        endTimestamp = sessionStartTs + remainingSeconds * 1000;
+        document.body.classList.add("timer-running");
+        startBtn.textContent = "⏸ إيقاف";
+
+        localStorage.setItem("focusRunningSession", JSON.stringify({
+            endTimestamp: endTimestamp,
+            sessionStartTs: sessionStartTs,
+            selectedMinutes: selectedMinutes,
+            fullFocus: isFullFocus
+        }));
+
+        requestWakeLock();
+        updateTimerDisplay();
+        clearInterval(timerInterval);
+        timerInterval = setInterval(syncTimer, 500);
+
+        if (isFullFocus) enterFocusLock();
+    }
+
+    startBtn.onclick = function () {
+        if (isFullFocus) return; // controlled by lock overlay only
+        if (isRunning) {
+            // pause
+            stopTimerInternals();
+            updateHandlePosition();
+            return;
+        }
+        startTimer(false);
+    };
+
+    resetBtn.onclick = function () {
+        if (isFullFocus) return;
+        stopTimerInternals();
+        remainingSeconds = selectedMinutes * 60;
+        updateTimerDisplay();
+    };
+
+    /* ========================= DRAG HANDLE (1 - 180 min) ========================== */
+    var isDragging = false;
+    function beginDrag(e) { if (isRunning) return; isDragging = true; if (e.cancelable) e.preventDefault(); }
+    function endDrag() { isDragging = false; }
+    function handleDrag(e) {
+        if (!isDragging || isRunning) return;
+        var p = (e.touches && e.touches.length) ? e.touches[0] : e;
+        var rect = circleContainer.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+        var angle = Math.atan2(p.clientY - cy, p.clientX - cx) + Math.PI / 2;
+        if (angle < 0) angle += Math.PI * 2;
+        var mins = Math.round((angle / (Math.PI * 2)) * MAX_DRAG_MINUTES);
+        if (mins < 1) mins = 1;
+        if (mins > MAX_DRAG_MINUTES) mins = MAX_DRAG_MINUTES;
+        selectedMinutes = mins;
+        remainingSeconds = selectedMinutes * 60;
+        document.querySelectorAll(".quick-btn").forEach(function (b) { b.classList.remove("active"); });
+        updateTimerDisplay();
+    }
+    dragHandle.addEventListener("mousedown", beginDrag);
+    dragHandle.addEventListener("touchstart", beginDrag, { passive: false });
+    window.addEventListener("mousemove", handleDrag);
+    window.addEventListener("touchmove", handleDrag, { passive: false });
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("touchend", endDrag);
+
+    /* ========================= QUICK TIMES ========================== */
+    document.querySelectorAll(".quick-btn").forEach(function (btn) {
+        btn.onclick = function () {
+            if (isRunning) return;
+            document.querySelectorAll(".quick-btn").forEach(function (b) { b.classList.remove("active"); });
+            this.classList.add("active");
+            selectedMinutes = parseInt(this.dataset.mins, 10);
+            remainingSeconds = selectedMinutes * 60;
+            updateTimerDisplay();
+        };
+    });
+
+    /* ========================= FULL FOCUS LOCK ========================== */
+    var focusLock = document.getElementById("focusLock");
+    var focusLockBtn = document.getElementById("focusLockBtn");
+    var lockTask = document.getElementById("lockTask");
+    var lockEmergencyBtn = document.getElementById("lockEmergencyBtn");
+
+    focusLockBtn.onclick = async function () {
+        if (isRunning) return;
+        var ok = await showConfirm({
+            icon: "🔒",
+            title: "بدء وضع التركيز الكامل",
+            message: "سيبدأ التركيز الكامل لمدة " + selectedMinutes + " دقيقة. لن تقدر تخرج قبل انتهاء الوقت إلا بخصم نقاط — جاهز؟",
+            okLabel: "ابدأ الآن",
+            cancelLabel: "لاحقًا"
+        });
+        if (!ok) return;
+        closeDrawer();
+        toggleFullscreen();
+        startTimer(true);
+    };
+
+    var lockHint = document.querySelector(".lock-hint");
+
+    function secsSinceStart() { return Math.floor((Date.now() - sessionStartTs) / 1000); }
+
+    function refreshEmergencyBtn() {
+        if (!isFullFocus) return;
+        var elapsed = secsSinceStart();
+        if (elapsed < FREE_EXIT_SECONDS) {
+            var left = FREE_EXIT_SECONDS - elapsed;
+            lockEmergencyBtn.textContent = "خروج مجاني (" + left + " ثانية متبقية)";
+            lockEmergencyBtn.style.color = "#6dffb0";
+            lockEmergencyBtn.style.borderColor = "#2a9d6b";
+            if (lockHint) lockHint.textContent = "يمكنك الخروج الآن مجانًا دون خصم أي نقاط. بعد " + FREE_EXIT_SECONDS + " ثوانٍ سيبدأ الخصم عند الخروج.";
+        } else {
+            lockEmergencyBtn.textContent = "إنهاء مبكر (سيُخصم من نقاطك)";
+            lockEmergencyBtn.style.color = "#ff7a8a";
+            lockEmergencyBtn.style.borderColor = "#5a2a34";
+            if (lockHint) lockHint.textContent = "لا تستسلم — ابقَ حتى تنتهي الجلسة. الخروج الآن يُلغي نقاط الجلسة ويخصم نقاط عقوبة.";
+        }
+    }
+
+    function enterFocusLock() {
+        lockBreachHandled = false;
+        lockTask.textContent = activeTaskLabel.textContent;
+        focusLock.classList.add("open");
+        refreshEmergencyBtn();
+        updateTimerDisplay();
+        renderLockSounds();
+    }
+    function exitFocusLock() {
+        isFullFocus = false;
+        focusLock.classList.remove("open");
+    }
+
+    lockEmergencyBtn.onclick = async function () {
+        var elapsed = secsSinceStart();
+        if (elapsed < FREE_EXIT_SECONDS) {
+            applyFreeExit();
+            return;
+        }
+        var PENALTY = 20;
+        var ok = await showConfirm({
+            icon: "⚠️",
+            title: "خروج مبكر",
+            message: "الخروج الآن سيُلغي نقاط هذه الجلسة ويخصم " + PENALTY + " نقطة عقوبة. متأكد؟",
+            okLabel: "نعم، اخرج",
+            cancelLabel: "استمر بالتركيز",
+            danger: true
+        });
+        if (!ok) return;
+        var pts = applyPenaltyExit();
+        showToast("تم الخروج. خُصمت " + PENALTY + " نقطة. رصيدك الآن: " + pts + " نقطة.", "danger");
+    };
+
+    /* ===== Shared exit actions (used by the manual button AND real app-leave detection) ===== */
+    function applyFreeExit() {
+        stopTimerInternals();
+        exitFocusLock();
+        remainingSeconds = selectedMinutes * 60;
+        updateTimerDisplay();
+        if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+    }
+    function applyPenaltyExit() {
+        var PENALTY = 20;
+        var pts = setPoints(getPoints() - PENALTY);
+        updateStats();
+        stopTimerInternals();
+        exitFocusLock();
+        remainingSeconds = selectedMinutes * 60;
+        updateTimerDisplay();
+        if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+        return pts;
+    }
+
+    /* ===== REAL enforcement: leaving the app/tab during Full Focus Lock counts as exiting =====
+       We can't force the OS to bring the user back (no browser allows that), so the honest
+       enforcement is: the instant they background the app, the session ends immediately with
+       the same free/penalty rule as the in-app button — not just when they click something. */
+    var lockBreachPending = null;
+    var lockBreachHandled = false;
+    function handleLockLeaveAttempt() {
+        if (!isFullFocus || !isRunning || lockBreachHandled) return;
+        lockBreachHandled = true;
+        var elapsed = secsSinceStart();
+        if (elapsed < FREE_EXIT_SECONDS) {
+            lockBreachPending = { penalized: false };
+            applyFreeExit();
+        } else {
+            var pts = applyPenaltyExit();
+            lockBreachPending = { penalized: true, points: pts };
+        }
+        if (("Notification" in window) && Notification.permission === "granted") {
+            try {
+                new Notification("🔒 FOCUS", {
+                    body: lockBreachPending.penalized
+                        ? "خرجت من وضع التركيز الكامل — تم خصم 20 نقطة تلقائيًا."
+                        : "تم إنهاء جلسة التركيز الكامل لأنك غادرت التطبيق.",
+                    icon: "icons/icon-192.png"
+                });
+            } catch (e) {}
+        }
+    }
+    document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") {
+            handleLockLeaveAttempt();
+        } else if (document.visibilityState === "visible" && lockBreachPending) {
+            var msg = lockBreachPending.penalized
+                ? "لاحظنا إنك خرجت من التطبيق أثناء وضع التركيز الكامل، فتم إنهاء الجلسة تلقائيًا وخُصمت 20 نقطة. رصيدك الآن: " + lockBreachPending.points + " نقطة."
+                : "تم إنهاء جلسة التركيز الكامل تلقائيًا لأنك غادرت التطبيق — بما إن ده كان خلال أول " + FREE_EXIT_SECONDS + " ثوانٍ من الجلسة، مفيش خصم نقاط.";
+            var breachType = lockBreachPending.penalized ? "danger" : "warning";
+            lockBreachPending = null;
+            setTimeout(function () { showToast(msg, breachType, 7000); }, 250);
+        }
+    });
+    window.addEventListener("pagehide", handleLockLeaveAttempt);
+
+    // Warn before closing tab while a session is running
+    window.addEventListener("beforeunload", function (e) {
+        if (isRunning) { e.preventDefault(); e.returnValue = ""; return ""; }
+    });
+
+    /* ========================= FINISH + POINTS + CELEBRATION ========================== */
+    var celebrate = document.getElementById("celebrate");
+    var celebPoints = document.getElementById("celebPoints");
+    var celebTotal = document.getElementById("celebTotal");
+    var celebBtn = document.getElementById("celebBtn");
+    var celebSub = document.getElementById("celebSub");
+
+    function playAlarm() {
+        try { alarmAudio.currentTime = 0; alarmAudio.volume = 1; alarmAudio.play().catch(function(){}); } catch (e) {}
+        if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 600]);
+    }
+    function stopAlarm() { try { alarmAudio.pause(); alarmAudio.currentTime = 0; } catch (e) {} }
+
+    function launchConfetti() {
+        var colors = ["#00d4ff", "#0052ff", "#ffd76a", "#8affc1", "#ff6ba6", "#ffffff"];
+        for (var i = 0; i < 70; i++) {
+            var c = document.createElement("div");
+            c.className = "confetti";
+            c.style.left = Math.random() * 100 + "vw";
+            c.style.background = colors[Math.floor(Math.random() * colors.length)];
+            c.style.animationDuration = (2 + Math.random() * 2.5) + "s";
+            c.style.animationDelay = (Math.random() * .8) + "s";
+            celebrate.appendChild(c);
+            (function (el) { setTimeout(function () { el.remove(); }, 5000); })(c);
+        }
+    }
+
+    function finishSession() {
+        var earned = selectedMinutes; // 1 نقطة لكل دقيقة تركيز
+        if (selectedMinutes >= 25) earned += 10;   // مكافأة جلسة طويلة
+        if (selectedMinutes >= 60) earned += 25;
+        if (isFullFocus) earned = Math.round(earned * 1.5); // مكافأة التركيز الكامل
+
+        var oldMinutes = parseInt(localStorage.getItem("focusMinutes") || "0", 10);
+        var oldSessions = parseInt(localStorage.getItem("focusSessions") || "0", 10);
+        var oldPoints = getPoints();
+        localStorage.setItem("focusMinutes", oldMinutes + selectedMinutes);
+        localStorage.setItem("focusSessions", oldSessions + 1);
+        setPoints(oldPoints + earned);
+
+        // record minutes per weekday for "best study days"
+        var dayStats = JSON.parse(localStorage.getItem("focusDayStats") || "[0,0,0,0,0,0,0]");
+        dayStats[new Date().getDay()] += selectedMinutes;
+        localStorage.setItem("focusDayStats", JSON.stringify(dayStats));
+
+        updateStats();
+        updateWeeklyStats();
+        renderBestDays();
+
+        exitFocusLock();
+        if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
+
+        playAlarm();
+        celebSub.textContent = isFullFocus
+            ? "أكملت جلسة تركيز كامل دون خروج — إنجاز يستحق التقدير! 🚀"
+            : "لقد ركّزت " + selectedMinutes + " دقيقة بنجاح. استمر على هذا الأداء الرائع!";
+        celebPoints.textContent = "+" + earned;
+        celebTotal.textContent = oldPoints + earned;
+        celebrate.classList.add("open");
+        launchConfetti();
+    }
+
+    celebBtn.onclick = function () {
+        stopAlarm();
+        celebrate.classList.remove("open");
+        remainingSeconds = selectedMinutes * 60;
+        updateTimerDisplay();
+    };
+
+    /* ========================= TASKS ========================== */
+    var taskInput = document.getElementById("taskInput");
+    var todoList = document.getElementById("todoList");
+    var activeTaskLabel = document.getElementById("activeTaskLabel");
+    var tasks = JSON.parse(localStorage.getItem("focusTasks") || "[]");
+    var activeTaskId = localStorage.getItem("focusActiveTaskId") || null;
+
+    function escapeHtml(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+    function renderTasks() {
+        localStorage.setItem("focusTasks", JSON.stringify(tasks));
+        if (activeTaskId) localStorage.setItem("focusActiveTaskId", activeTaskId);
+        else localStorage.removeItem("focusActiveTaskId");
+        todoList.innerHTML = "";
+        var activeObj = null;
+        tasks.forEach(function (task) {
+            var li = document.createElement("li");
+            li.className = "todo-item " + (task.completed ? "completed" : "");
+            var isActive = task.id === activeTaskId;
+            if (isActive) activeObj = task;
+            li.innerHTML =
+                '<div><input type="checkbox" ' + (task.completed ? "checked" : "") +
+                ' data-id="' + task.id + '" class="task-check"><span>' + escapeHtml(task.title) + '</span></div>' +
+                '<div><button class="btn-nb-action ' + (isActive ? "active" : "") + '" data-action="focus" data-id="' + task.id + '">' +
+                (isActive ? "🎯 ينفذ" : "حدد") + '</button>' +
+                '<button class="btn-nb-action" data-action="delete" data-id="' + task.id + '">🗑️</button></div>';
+            todoList.appendChild(li);
+        });
+        activeTaskLabel.textContent = activeObj ? "🎯 " + activeObj.title : "🎯 لا توجد مهمة محددة";
+        lockTask.textContent = activeTaskLabel.textContent;
+    }
+
+    document.getElementById("addTaskBtn").onclick = function () {
+        var val = taskInput.value.trim();
+        if (!val) return;
+        var nt = { id: Date.now().toString(), title: val, completed: false };
+        tasks.push(nt);
+        if (!activeTaskId) activeTaskId = nt.id;
+        taskInput.value = "";
+        renderTasks();
+    };
+    taskInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.nativeEvent?.isComposing) document.getElementById("addTaskBtn").click();
+    });
+
+    todoList.onclick = function (e) {
+        var id = e.target.dataset.id;
+        if (e.target.classList.contains("task-check")) {
+            var t = tasks.find(function (x) { return x.id === id; });
+            if (t) t.completed = e.target.checked;
+        } else if (e.target.dataset.action === "focus") {
+            activeTaskId = id;
+        } else if (e.target.dataset.action === "delete") {
+            tasks = tasks.filter(function (x) { return x.id !== id; });
+            if (activeTaskId === id) activeTaskId = null;
+        }
+        renderTasks();
+    };
+    renderTasks();
+
+    /* ========================= SCHEDULE + REMINDERS ========================== */
+    var courseTitle = document.getElementById("courseTitle");
+    var courseDay = document.getElementById("courseDay");
+    var courseTime = document.getElementById("courseTime");
+    var scheduleList = document.getElementById("scheduleList");
+    var requestNotifBtn = document.getElementById("requestNotifBtn");
+    var courses = JSON.parse(localStorage.getItem("focusSchedule") || "[]");
+
+    function renderSchedule() {
+        localStorage.setItem("focusSchedule", JSON.stringify(courses));
+        scheduleList.innerHTML = "";
+        courses.forEach(function (c) {
+            var li = document.createElement("li");
+            li.className = "schedule-card";
+            li.innerHTML =
+                '<div class="course-info"><strong>📖 ' + escapeHtml(c.title) + '</strong>' +
+                '<span>📅 ' + c.day + ' - ⏰ ' + c.time + '</span></div>' +
+                '<button class="btn-del-course" data-id="' + c.id + '">🗑️</button>';
+            scheduleList.appendChild(li);
+        });
+        renderMindmap();
+        updateNextLesson();
+    }
+    document.getElementById("addCourseBtn").onclick = function () {
+        var title = courseTitle.value.trim(), day = courseDay.value, time = courseTime.value;
+        if (!title || !time) { alert("يرجى إدخال اسم الدرس والوقت!"); return; }
+        courses.push({ id: Date.now().toString(), title: title, day: day, time: time });
+        courseTitle.value = ""; courseTime.value = "";
+        renderSchedule();
+    };
+    scheduleList.onclick = function (e) {
+        if (e.target.classList.contains("btn-del-course")) {
+            var id = e.target.dataset.id;
+            courses = courses.filter(function (c) { return c.id !== id; });
+            renderSchedule();
+        }
+    };
+    requestNotifBtn.onclick = function () {
+        if (!("Notification" in window)) { alert("هذا الجهاز لا يدعم الإشعارات."); return; }
+        Notification.requestPermission().then(function (perm) {
+            if (perm === "granted") {
+                requestNotifBtn.textContent = "مفعل ✔️";
+                requestNotifBtn.style.background = "#34c759";
+                requestNotifBtn.style.borderColor = "#34c759";
+            } else { alert("لم يتم السماح بالإشعارات."); }
+        });
+    };
+    if (("Notification" in window) && Notification.permission === "granted") {
+        requestNotifBtn.textContent = "مفعل ✔️";
+        requestNotifBtn.style.background = "#34c759";
+        requestNotifBtn.style.borderColor = "#34c759";
+    }
+
+    var lastFired = {};
+    setInterval(function () {
+        var now = new Date();
+        var daysMap = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+        var currentDay = daysMap[now.getDay()];
+        var nowMinutes = now.getHours() * 60 + now.getMinutes();
+        courses.forEach(function (c) {
+            if (c.day !== currentDay) return;
+            var parts = c.time.split(":");
+            var lessonMinutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+            var diff = lessonMinutes - nowMinutes; // minutes until the lesson starts
+            [15, 5, 0].forEach(function (leadTime) {
+                if (diff !== leadTime) return;
+                var key = c.id + currentDay + c.time + "_lead" + leadTime;
+                if (lastFired[key]) return;
+                lastFired[key] = true;
+                var body = leadTime === 0
+                    ? "حان الآن موعد درس: " + c.title
+                    : "درس \"" + c.title + "\" هيبدأ بعد " + leadTime + " دقيقة ⏰";
+                if (("Notification" in window) && Notification.permission === "granted") {
+                    new Notification("FOCUS - تذكير 📚", { body: body, icon: "icons/icon-192.png" });
+                }
+                showToast(body, leadTime === 0 ? "danger" : "info", 6000);
+                if (leadTime === 0) { playAlarm(); setTimeout(stopAlarm, 8000); }
+            });
+        });
+    }, 15000);
+    renderSchedule();
+
+    /* ========================= WEEKLY PLAN ========================== */
+    var weeklyTargetInput = document.getElementById("weeklyTargetInput");
+    var weeklyProgressBar = document.getElementById("weeklyProgressBar");
+    var percentageText = document.getElementById("percentageText");
+    var statsDetailText = document.getElementById("statsDetailText");
+    weeklyTargetInput.value = localStorage.getItem("focusWeeklyTarget") || "10";
+
+    function updateWeeklyStats() {
+        var totalMins = parseInt(localStorage.getItem("focusMinutes") || "0", 10);
+        var targetHours = parseFloat(weeklyTargetInput.value) || 10;
+        var doneHours = totalMins / 60;
+        var percent = Math.round((doneHours / targetHours) * 100);
+        if (percent > 100) percent = 100;
+        if (percent < 0) percent = 0;
+        weeklyProgressBar.style.width = percent + "%";
+        percentageText.textContent = percent + "%";
+        statsDetailText.textContent = "أنجزت " + doneHours.toFixed(1) + " ساعة من أصل " + targetHours + " ساعات";
+        localStorage.setItem("focusWeeklyTarget", targetHours);
+    }
+    weeklyTargetInput.onchange = updateWeeklyStats;
+
+    /* ========================= STATS + STREAK ========================== */
+    function updateStreak() {
+        var today = new Date().toDateString();
+        var last = localStorage.getItem("focusLastDay");
+        var streak = parseInt(localStorage.getItem("focusStreak") || "0", 10);
+        if (last !== today) {
+            var y = new Date(); y.setDate(y.getDate() - 1);
+            streak = (last === y.toDateString()) ? streak + 1 : 1;
+            localStorage.setItem("focusStreak", streak);
+            localStorage.setItem("focusLastDay", today);
+        }
+        if (streak < 1) { streak = 1; localStorage.setItem("focusStreak", 1); }
+        return streak;
+    }
+    function updateStats() {
+        document.getElementById("statSessions").textContent = localStorage.getItem("focusSessions") || "0";
+        document.getElementById("statMinutes").textContent = localStorage.getItem("focusMinutes") || "0";
+        document.getElementById("statDays").textContent = localStorage.getItem("focusStreak") || "1";
+        document.getElementById("statPointsBanner").textContent = getPoints();
+    }
+
+    /* ========================= AMBIENT SOUNDS ========================== */
+    var audioPlayers = {};
+    var globalVolume = 0.7;
+    var volumeSlider = document.getElementById("soundVolume");
+    volumeSlider.oninput = function () {
+        globalVolume = this.value / 100;
+        Object.keys(audioPlayers).forEach(function (k) { audioPlayers[k].volume = globalVolume; });
+    };
+    function getAudio(key) {
+        if (!SOUND_FILES[key]) return null;
+        if (!audioPlayers[key]) {
+            var a = new Audio(SOUND_FILES[key]);
+            a.loop = true; a.preload = "auto"; a.volume = globalVolume;
+            audioPlayers[key] = a;
+        }
+        return audioPlayers[key];
+    }
+    function syncSoundButtonsUI(key, playing) {
+        document.querySelectorAll('[data-sound="' + key + '"]').forEach(function (el) {
+            el.classList.toggle("playing", playing);
+            if (el.classList.contains("sound-play-btn")) el.textContent = playing ? "إيقاف" : "تشغيل";
+        });
+    }
+    function toggleSoundByKey(key) {
+        if (!ownsSound(key)) {
+            showToast("🔒 هذا الصوت مقفول — تقدر تفتحه من المتجر بنقاطك.", "warning");
+            return;
+        }
+        var audio = getAudio(key);
+        if (!audio) return;
+        if (!audio.paused) {
+            audio.pause();
+            syncSoundButtonsUI(key, false);
+            clearMediaSessionIfNoneUnplaying();
+            return;
+        }
+        Object.keys(audioPlayers).forEach(function (k) {
+            if (k !== key && audioPlayers[k]) {
+                audioPlayers[k].pause();
+                audioPlayers[k].currentTime = 0;
+                syncSoundButtonsUI(k, false);
+            }
+        });
+        audio.volume = globalVolume;
+        audio.play().then(function () {
+            syncSoundButtonsUI(key, true);
+            setMediaSessionSound(key);
+        }).catch(function (err) {
+            console.error("FOCUS sound error:", key, err);
+            showToast('تعذّر تشغيل صوت "' + (SOUND_META[key] ? SOUND_META[key].name : key) + '".', "danger");
+        });
+    }
+    // Event delegation so dynamically-rendered premium/lock/store buttons work without re-binding.
+    document.addEventListener("click", function (e) {
+        var btn = e.target.closest && e.target.closest(".sound-play-btn[data-sound], .lock-sound-btn[data-sound]");
+        if (!btn) return;
+        toggleSoundByKey(btn.dataset.sound);
+    });
+
+    function renderPremiumSounds() {
+        var wrap = document.getElementById("premiumSoundsList");
+        if (!wrap) return;
+        var html = "";
+        Object.keys(SOUND_META).forEach(function (key) {
+            var meta = SOUND_META[key];
+            if (meta.free) return;
+            if (ownsSound(key)) {
+                html += '<div class="sound-card"><div class="sound-info"><span>' + meta.emoji + '</span><span>' + meta.name + '</span></div>' +
+                    '<button class="sound-play-btn" data-sound="' + key + '">تشغيل</button></div>';
+            } else {
+                html += '<div class="sound-card"><div class="sound-info"><span>🔒</span><span>' + meta.name + ' — ' + meta.price + ' نقطة</span></div>' +
+                    '<button class="sound-play-btn" data-open-store="1">المتجر</button></div>';
+            }
+        });
+        wrap.innerHTML = html;
+        wrap.querySelectorAll('[data-open-store]').forEach(function (b) {
+            b.onclick = function () {
+                document.querySelectorAll(".modal-page").forEach(function (m) { m.classList.remove("open"); });
+                document.getElementById("modalStore").classList.add("open");
+                renderStore();
+            };
+        });
+    }
+
+    function renderLockSounds() {
+        var wrap = document.getElementById("lockSounds");
+        if (!wrap) return;
+        var html = "";
+        Object.keys(SOUND_META).forEach(function (key) {
+            var meta = SOUND_META[key];
+            var owned = ownsSound(key);
+            html += '<button class="lock-sound-btn' + (owned ? "" : " locked") + '" data-sound="' + key + '" title="' + meta.name + '">' +
+                (owned ? meta.emoji : "🔒") + '</button>';
+        });
+        wrap.innerHTML = html;
+    }
+
+    /* ========================= STORE ========================== */
+    var previewAudio = null, previewBtnEl = null, previewTimer = null;
+    function previewSound(key, btnEl) {
+        if (previewAudio) {
+            previewAudio.pause();
+            if (previewBtnEl) previewBtnEl.textContent = "استمع";
+            clearTimeout(previewTimer);
+            var wasThisBtn = (previewBtnEl === btnEl);
+            previewAudio = null; previewBtnEl = null;
+            if (wasThisBtn) return;
+        }
+        previewAudio = new Audio(SOUND_FILES[key]);
+        previewAudio.volume = globalVolume;
+        previewAudio.play().catch(function () {});
+        btnEl.textContent = "⏹ إيقاف المعاينة";
+        previewBtnEl = btnEl;
+        previewTimer = setTimeout(function () {
+            if (previewAudio) previewAudio.pause();
+            if (previewBtnEl) previewBtnEl.textContent = "🔊 استمع";
+            previewAudio = null; previewBtnEl = null;
+        }, 12000);
+    }
+
+    function renderStore() {
+        var grid = document.getElementById("storeGrid");
+        var balanceEl = document.getElementById("storeBalance");
+        if (!grid || !balanceEl) return;
+        var pts = getPoints();
+        balanceEl.textContent = pts + " نقطة";
+        var html = "";
+        Object.keys(SOUND_META).forEach(function (key) {
+            var meta = SOUND_META[key];
+            if (meta.free) return;
+            var owned = ownsSound(key);
+            html += '<div class="store-item' + (owned ? " owned" : "") + '">' +
+                '<div class="store-item-emoji">' + meta.emoji + '</div>' +
+                '<div class="store-item-info"><div class="si-name">' + meta.name + '</div><div class="si-desc">' + (meta.desc || "") + '</div></div>' +
+                '<div class="store-item-action">';
+            if (owned) {
+                html += '<div class="store-owned-badge">✅ مملوك</div>' +
+                        '<button class="store-preview-btn sound-play-btn" data-sound="' + key + '">تشغيل</button>';
+            } else {
+                html += '<div class="store-price">🪙 ' + meta.price + '</div>' +
+                        '<button class="store-buy-btn" data-buy="' + key + '"' + (pts < meta.price ? " disabled" : "") + '>شراء</button>' +
+                        '<button class="store-preview-btn" data-preview="' + key + '">🔊 استمع</button>';
+            }
+            html += '</div></div>';
+        });
+        grid.innerHTML = html || '<div class="empty-hint">لا توجد عناصر متاحة حاليًا.</div>';
+        grid.querySelectorAll("[data-buy]").forEach(function (b) {
+            b.onclick = function () {
+                var key = this.dataset.buy;
+                var meta = SOUND_META[key];
+                showConfirm({
+                    icon: meta.emoji,
+                    title: 'شراء "' + meta.name + '"؟',
+                    message: "سيتم خصم " + meta.price + " نقطة من رصيدك. رصيدك الحالي: " + getPoints() + " نقطة.",
+                    okLabel: "شراء الآن",
+                    cancelLabel: "إلغاء"
+                }).then(function (ok) { if (ok) buySound(key); });
+            };
+        });
+        grid.querySelectorAll("[data-preview]").forEach(function (b) {
+            b.onclick = function () { previewSound(this.dataset.preview, this); };
+        });
+    }
+
+    renderPremiumSounds();
+    renderLockSounds();
+    renderStore();
+
+    /* ========================= RESUME RUNNING SESSION (background/reload) ========================== */
+    (function resumeSession() {
+        var raw = localStorage.getItem("focusRunningSession");
+        if (!raw) return;
+        try {
+            var s = JSON.parse(raw);
+            selectedMinutes = s.selectedMinutes;
+            var left = Math.round((s.endTimestamp - Date.now()) / 1000);
+            if (left > 0) {
+                remainingSeconds = left;
+                endTimestamp = s.endTimestamp;
+                isRunning = true;
+                isFullFocus = !!s.fullFocus;
+                document.body.classList.add("timer-running");
+                startBtn.textContent = "⏸ إيقاف";
+                requestWakeLock();
+                clearInterval(timerInterval);
+                timerInterval = setInterval(syncTimer, 500);
+                updateTimerDisplay();
+                if (isFullFocus) enterFocusLock();
+            } else {
+                // session finished while app was closed
+                localStorage.removeItem("focusRunningSession");
+                remainingSeconds = 0;
+                finishSession();
+            }
+        } catch (e) { localStorage.removeItem("focusRunningSession"); }
+    })();
+
+    /* ========================= MIND MAP OF LESSONS ========================== */
+    var mindmapWrap = document.getElementById("mindmapWrap");
+    var DAYS_ORDER = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+    function renderMindmap() {
+        if (!mindmapWrap) return;
+        if (!courses.length) {
+            mindmapWrap.innerHTML = '<div class="empty-hint">لا توجد دروس بعد.<br>أضف دروسك من "جدول الدروس" لتظهر هنا كخريطة ذهنية منظمة — والأيام الفاضية هتبان تلقائيًا.</div>';
+            return;
+        }
+        var html = '<div class="mindmap-center">🎯 دروسي</div>';
+        DAYS_ORDER.forEach(function (day) {
+            var dayCourses = courses.filter(function (c) { return c.day === day; })
+                .sort(function (a, b) { return a.time.localeCompare(b.time); });
+            if (!dayCourses.length) {
+                html += '<div class="mindmap-day-group"><div class="mindmap-day-head free">🟢 ' + day + ' — يوم فاضي</div>' +
+                    '<div class="mindmap-free-note">مفيش دروس مسجلة — وقت ممتاز للمذاكرة الحرة أو المراجعة.</div></div>';
+                return;
+            }
+            html += '<div class="mindmap-day-group"><div class="mindmap-day-head">📅 ' + day + ' (' + dayCourses.length + ')</div>';
+            html += '<div class="mindmap-branches">';
+            dayCourses.forEach(function (c) {
+                html += '<div class="mindmap-node"><b>' + c.time + '</b>' + escapeHtml(c.title) + '</div>';
+            });
+            html += '</div></div>';
+        });
+        mindmapWrap.innerHTML = html;
+    }
+
+    /* ========================= BEST STUDY DAYS ========================== */
+    var bestDaysList = document.getElementById("bestDaysList");
+    var bestDayNote = document.getElementById("bestDayNote");
+    function renderBestDays() {
+        if (!bestDaysList) return;
+        var stats = JSON.parse(localStorage.getItem("focusDayStats") || "[0,0,0,0,0,0,0]");
+        var loadByDay = DAYS_ORDER.map(function (day) {
+            return courses.filter(function (c) { return c.day === day; }).length;
+        });
+        var max = Math.max.apply(null, stats);
+        var html = "";
+        DAYS_ORDER.forEach(function (name, i) {
+            var mins = stats[i] || 0;
+            var pct = max > 0 ? Math.round((mins / max) * 100) : 0;
+            var isTop = max > 0 && mins === max;
+            var label = mins >= 60 ? (mins / 60).toFixed(1) + " س" : mins + " د";
+            var busy = loadByDay[i];
+            var badge = busy === 0 ? '<span class="bestday-badge">🟢 فاضي</span>' : '<span class="bestday-badge busy">📚 ' + busy + ' درس</span>';
+            html += '<div class="bestday-row">' +
+                '<div class="bestday-name">' + name + '</div>' + badge +
+                '<div class="bestday-bar-bg"><div class="bestday-bar-fill ' + (isTop ? "top" : "") + '" style="width:' + pct + '%"></div></div>' +
+                '<div class="bestday-val">' + label + '</div></div>';
+        });
+        bestDaysList.innerHTML = html;
+
+        // Recommendation: prefer free / lightest-load days; use historical performance as a tie-breaker.
+        var minLoad = Math.min.apply(null, loadByDay);
+        var candidateIdxs = [];
+        loadByDay.forEach(function (load, i) { if (load === minLoad) candidateIdxs.push(i); });
+        candidateIdxs.sort(function (a, b) { return (stats[b] || 0) - (stats[a] || 0); });
+        var recommended = candidateIdxs.slice(0, 3).map(function (i) { return DAYS_ORDER[i]; });
+
+        if (minLoad === 0) {
+            bestDayNote.textContent = "🟢 أفضل أيامك للمذاكرة (فاضية من الدروس): " + recommended.join("، ") + ".";
+        } else if (max > 0) {
+            var topIdx = stats.indexOf(max);
+            bestDayNote.textContent = "🏆 أكتر يوم بتركّز فيه هو " + DAYS_ORDER[topIdx] + " — وأخف أيامك من ناحية الدروس: " + recommended.join("، ") + ".";
+        } else {
+            bestDayNote.textContent = "بناءً على جدولك، أخف أيامك من الدروس: " + recommended.join("، ") + " — جرب تذاكر فيهم!";
+        }
+    }
+
+    /* ========================= NEXT LESSON BANNER + REAL ALERT ========================== */
+    var nextLessonBanner = document.getElementById("nextLessonBanner");
+    var nextLessonTitle = document.getElementById("nextLessonTitle");
+    var nextLessonCountdown = document.getElementById("nextLessonCountdown");
+
+    function getNextLesson() {
+        if (!courses.length) return null;
+        var now = new Date();
+        var best = null, bestDiff = Infinity;
+        courses.forEach(function (c) {
+            var dayIdx = DAYS_ORDER.indexOf(c.day);
+            if (dayIdx < 0) return;
+            var parts = c.time.split(":");
+            for (var add = 0; add < 7; add++) {
+                var d = new Date(now);
+                d.setDate(now.getDate() + add);
+                if (d.getDay() !== dayIdx) continue;
+                d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+                var diff = d.getTime() - now.getTime();
+                if (diff > 0 && diff < bestDiff) { bestDiff = diff; best = { course: c, date: d, diff: diff }; }
+            }
+        });
+        return best;
+    }
+
+    function updateNextLesson() {
+        if (!nextLessonBanner) return; // guard: called once too early during initial schedule render
+        var nx = getNextLesson();
+        if (!nx) { nextLessonBanner.classList.remove("show"); return; }
+        nextLessonBanner.classList.add("show");
+        nextLessonTitle.textContent = nx.course.title;
+        var mins = Math.floor(nx.diff / 60000);
+        var txt;
+        if (mins < 60) txt = "بعد " + mins + " دقيقة";
+        else if (mins < 1440) txt = "بعد " + Math.floor(mins / 60) + " ساعة و " + (mins % 60) + " دقيقة";
+        else txt = "يوم " + nx.course.day + " الساعة " + nx.course.time;
+        nextLessonCountdown.textContent = "📅 " + nx.course.day + " " + nx.course.time + " • " + txt;
+    }
+
+    // pre-lesson reminder (10 min & 1 min before)
+    var preFired = {};
+    setInterval(function () {
+        updateNextLesson();
+        var nx = getNextLesson();
+        if (!nx) return;
+        var mins = Math.floor(nx.diff / 60000);
+        [10, 1].forEach(function (mark) {
+            var key = nx.course.id + "_" + nx.date.toDateString() + "_" + mark;
+            if (mins === mark && !preFired[key]) {
+                preFired[key] = true;
+                if (("Notification" in window) && Notification.permission === "granted") {
+                    new Notification("FOCUS - اقترب موعد الدرس ⏰", {
+                        body: "الدرس \"" + nx.course.title + "\" بعد " + mark + " دقيقة",
+                        icon: "icons/icon-192.png"
+                    });
+                }
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            }
+        });
+    }, 20000);
+
+    /* ========================= PWA: OFFLINE + QUICK INSTALL ========================== */
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js").catch(function () {});
+    }
+    var installBtn = document.getElementById("installBtn");
+    var deferredPrompt = null;
+    window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.classList.add("show");
+    });
+    installBtn.onclick = function () {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function () {
+                deferredPrompt = null;
+                installBtn.classList.remove("show");
+            });
+        } else {
+            alert("لتثبيت التطبيق:\n\n• على أندرويد (Chrome): القائمة ⋮ ← \"تثبيت التطبيق\" / \"إضافة إلى الشاشة الرئيسية\".\n• على آيفون (Safari): زر المشاركة ⬆️ ← \"إضافة إلى الشاشة الرئيسية\".");
+        }
+    };
+    window.addEventListener("appinstalled", function () { installBtn.classList.remove("show"); });
+    // Show manual-install hint if not already installed as standalone
+    var isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+    if (!isStandalone) setTimeout(function () { installBtn.classList.add("show"); }, 800);
+
+    /* ========================= INIT ========================== */
+    updateStreak();
+    updateTimerDisplay();
+    updateStats();
+    updateWeeklyStats();
+    renderMindmap();
+    renderBestDays();
+    updateNextLesson();
+});
+</script>
+</body>
+</html>

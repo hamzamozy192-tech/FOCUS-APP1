@@ -1,0 +1,27 @@
+{
+  "name": "FOCUS - التركيز والمذاكرة",
+  "short_name": "FOCUS",
+  "description": "تطبيق التركيز والمذاكرة مع مؤقت حتى 180 دقيقة، وضع التركيز الكامل، أصوات محيطة، وخريطة ذهنية للدروس.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050a14",
+  "theme_color": "#050a14",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
