@@ -633,12 +633,12 @@
 
 <!-- Hidden intro music (aesthetic only, not part of the ambient focus sounds) -->
 <audio id="introAudio" preload="auto">
-    <source src="assets/audio/focus.mp3" type="audio/mpeg">
+    <source src="focus.mp3" type="audio/mpeg">
 </audio>
 
 <!-- Hidden alarm audio (end of session / lesson reminder) -->
 <audio id="alarmAudio" preload="auto" loop>
-    <source src="assets/audio/alarm.mp3" type="audio/mpeg">
+    <source src="alarm.mp3" type="audio/mpeg">
 </audio>
 
 <main id="app">
@@ -925,17 +925,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
     /* ========================= AUDIO SOURCES ========================== */
     var SOUND_FILES = {
-        rain:     "assets/audio/rain.mp3",
-        wind:     "assets/audio/wind.mp3",
-        storm:    "assets/audio/storm.mp3",
-        keyboard: "assets/audio/keyboard.mp3",
-        penl:     "assets/audio/pen.mp3",
-        book:     "assets/audio/book.mp3",
-        ocean:    "assets/audio/ocean.mp3",
-        night:    "assets/audio/night.mp3",
-        fire:     "assets/audio/fire.mp3",
-        cafe:     "assets/audio/cafe.mp3",
-        chimes:   "assets/audio/chimes.mp3"
+        rain:     "rain.mp3",
+        wind:     "wind.mp3",
+        storm:    "storm.mp3",
+        keyboard: "keyboard.mp3",
+        penl:     "pen.mp3",
+        book:     "book.mp3",
+        ocean:    "ocean.mp3",
+        night:    "night.mp3",
+        fire:     "fire.mp3",
+        cafe:     "cafe.mp3",
+        chimes:   "chimes.mp3"
     };
     /* NOTE: focus.mp3 is intentionally NOT listed here — it is reserved for the
        intro screen only and must never appear as a selectable ambient sound. */
